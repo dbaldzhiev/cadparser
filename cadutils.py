@@ -2,11 +2,8 @@
 ### VERSION 2.00 STANDALONE
 ### TESTED ON WINDOWS PYTHON 3.8.2
 
-import datetime
 import logging
 import re
-import sys
-from datetime import datetime
 from os import path
 
 from tqdm import tqdm
@@ -81,20 +78,14 @@ class CadasterLayer:
         geoPtObjectsStrings = rx_geopointobj.finditer(cadItem)
 
         if lineObjectsStrings:
-            print("PARSING LINES:")
             self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
         if contObjectsStrings:
-            print("PARSING CONTOURS:")
             self.contourObj = [ContC(contour.groups(), hdr) for contour in contObjectsStrings]
-
         if textObjectsStrings:
             self.textObj = [TextC(text.groups(), hdr) for text in textObjectsStrings]
-
         if symbObjectsStrings:
-            print("PARSING SYMBOLS:")
             self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in symbObjectsStrings]
         if geoPtObjectsStrings:
-            print("PARSING GEOPOINTS:")
             self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in geoPtObjectsStrings]
 
     def __getitem__(self, item):
