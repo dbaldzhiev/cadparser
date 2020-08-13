@@ -60,63 +60,39 @@ class CadasterLayer:
         rx_LCadaster = re.compile("LAYER CADASTER([\s\S]*?)END_LAYER")
         cadItem = rx_LCadaster.search(data).group()
         rx_textobj = re.compile(
-            "^T\s+(\d)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+(L|C|R)(T|C|D)\s+(?:(?:\"(.*)\"\s)?(C|P|L|V|S|A)\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
+            "^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+(L|C|R)(T|C|D)\s+(?:(?:\"(.*)\"\s)?(C|P|L|V|S|A)\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
             re.MULTILINE)
         rx_lineobj = re.compile(
             "(^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
             re.MULTILINE)
-        rx_conobj = re.compile("(^C[\s\S]*?\n)(?=^[PLCST]|\Z)", re.MULTILINE)
-        rx_symbobj = re.compile("(^S[\s\S]*?\n)(?=^[PLCST]|\Z)", re.MULTILINE)
+        rx_conobj = re.compile("C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n((?:(?:\d+)\s+)*)", re.MULTILINE)
+        rx_symbobj = re.compile("S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))", re.MULTILINE)
         rx_geopointobj = re.compile(
             "P\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\"(.*)\"\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
             re.MULTILINE)
 
-        def parseContour(obj):
-            contdata = []
-            rx_contour_decimate = re.compile(
-                "C\s+(\S+)\s+(\S*)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s{1,2}([\s\S]*)")
-            rx_extractSubs = re.compile("\S+")
-            for i in range(len(obj)):
-                a = rx_contour_decimate.search(obj[i])
-                if a is not (None):
-                    listOfLineIdsInContour = rx_extractSubs.findall(a.group(7))
-                    contdata.append(
-                        [a.group(1), a.group(2), a.group(3), a.group(4), a.group(5), a.group(6),
-                         listOfLineIdsInContour])
-            return contdata
-
-        def parseSymbol(obj):
-            symbdata = []
-            rx_symb = re.compile(
-                "S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)")
-            for i in range(len(obj)):
-                a = rx_symb.search(obj[i])
-                if a is not (None):
-                    symbdata.append(
-                        [a.group(1), a.group(2), a.group(3), a.group(4), a.group(5), a.group(6), a.group(7),
-                         a.group(8)])
-            logger.info("TOTAL SYMBOLS RECOGNIZED: " + str(len(symbdata)))
-            return symbdata
 
         textObjectsStrings = rx_textobj.finditer(cadItem)
         lineObjectsStrings = rx_lineobj.finditer(cadItem)
-        contObjectsStrings = rx_conobj.findall(cadItem)
-        symbObjectsStrings = rx_symbobj.findall(cadItem)
+
+        contObjectsStrings = rx_conobj.finditer(cadItem)
+        symbObjectsStrings = rx_symbobj.finditer(cadItem)
+
         geoPtObjectsStrings = rx_geopointobj.finditer(cadItem)
 
         if lineObjectsStrings:
             print("PARSING LINES:")
             self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
-        if not (len(contObjectsStrings) == 0):
+        if contObjectsStrings:
             print("PARSING CONTOURS:")
-            self.contourObj = [ContC(contour, hdr) for contour in tqdm(parseContour(contObjectsStrings))]
+            self.contourObj = [ContC(contour.groups(), hdr) for contour in contObjectsStrings]
 
         if textObjectsStrings:
             self.textObj = [TextC(text.groups(), hdr) for text in textObjectsStrings]
 
-        if not (len(symbObjectsStrings) == 0):
+        if symbObjectsStrings:
             print("PARSING SYMBOLS:")
-            self.symbolObj = [SymbolC(symb, hdr) for symb in tqdm(parseSymbol(symbObjectsStrings))]
+            self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in symbObjectsStrings]
         if geoPtObjectsStrings:
             print("PARSING GEOPOINTS:")
             self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in geoPtObjectsStrings]
@@ -127,10 +103,13 @@ class CadasterLayer:
 
 class LineC:
     def __init__(self, array, hdr):
-        self.type = str(array[0])
-        self.lid = int(array[1])
-        self.bordertype = str(array[2])
-        self.ptlist = [LinecPt(array[3][i], hdr) for i in range(len(array[3]))]
+        self.type = str(array[1])
+        self.lid = int(array[2])
+        self.bordertype = str(array[3])
+        self.datecreated = str(array[4])
+        self.datedestroyed = str(array[5])
+        rx_ptlist = re.compile("(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+);")
+        self.ptlist = [LinecPt(p.groups(),hdr) for p in rx_ptlist.finditer(array[6])]
         self.get_point_sequence = [pt.get_XY for pt in self.ptlist]
         self.get_referenced_point_sequence = [pt.get_XYR for pt in self.ptlist]
 
@@ -146,7 +125,6 @@ class LinecPt:
         self.ptacc = array[3]
         self.permasig = array[4]
         self.deter = array[5]
-
         self.get_XY = self.ptX, self.ptY
         self.get_XYR = self.ptX + hdr.refX, self.ptY + hdr.refY
         self.ptXR = self.ptX + hdr.refX
@@ -164,8 +142,10 @@ class ContC:
         self.posX = float(array[3])
         self.datecreated = array[4]
         self.datedestroyed = array[5]
-        self.ids = [int(ar) for ar in array[6]]  ### version agnostic
+        rx_contid = re.compile("(\d+)")
+        self.ids = rx_contid.findall(array[6])
         self.posXR = self.posX + hdr.refX
+        self.posYR = self.posY + hdr.refY
 
 
 class TextC:
@@ -212,7 +192,7 @@ class SchemaLevelC:
         return getattr(self, item)
 
 
-class GeoPointC():
+class GeoPointC:
     def __init__(self, array, hdr):
         self.type = array[0]
         self.id = array[1]
@@ -236,22 +216,17 @@ class GeoPointC():
 
 
 class SymbolC:
-    def __init__(self, array):
+    def __init__(self, array,hdr):
         self.type = array[0]
         self.id = array[1]
-        self.posY = array[2]
-        self.posX = array[3]
+        self.posY = float(array[2])
+        self.posX = float(array[3])
         self.rot = array[4]
         self.scale = array[5]
         self.datecreated = array[6]
         self.datedestroyed = array[7]
-
-
-def filterlines(c, l):
-    reg = [x.lid for x in l]
-    indx = [reg.index(y) for y in c.ids]
-    ret = [l[m] for m in indx]
-    return ret
+        self.posXR = self.posX + hdr.refX
+        self.posYR = self.posY + hdr.refY
 
 
 def opener(filename):
@@ -280,22 +255,3 @@ def translate(textbytes):
         goodText = goodText + letter
 
     return goodText
-
-
-def dateCheck(string):
-    try:
-        result = datetime.strptime(string, '%d.%m.%Y')
-    except:
-        result = None
-    return result
-
-
-def errorProcedure(e=None, f=None, Header=None, critical=True):
-    logger.error(e, exc_info=True)
-    # logger.debug(traceback.format_exc())
-    # print(traceback.format_exc())
-    if critical:
-        print(
-            datetime.datetime.now().isoformat() + ", " + "FAIL " + ", " + (f if f is not None else "unknown") + ", " + (
-                Header.version if Header is not None else "unknown") + ", " + str(e) + "\n")
-        sys.exit(1)

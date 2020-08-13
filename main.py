@@ -22,10 +22,6 @@ except getopt.GetoptError:
     sys.exit(2)
 
 if __name__ == '__main__':
-    cadFileObject = {}
     cadFileText = cadutils.opener(filename)
     cadfileItems = cadutils.ReadCadastralFile(cadFileText)
-    # cadFileObject.update({"HEADER":cadutils.Header(cadFileText)})
-    # cadFileObject.update({"CADASTER":cadutils.Cadaster(cadFileText)})
-    # r=a.CadasterLayer.gepointObj[0]
     print("test")
