@@ -20,7 +20,6 @@ class ReadCadastralFile:
         self.Header = HeaderLayer(data)
         self.CadasterLayer = CadasterLayer(data, self.Header)
         self.CadasterControl = ControlCadastre(data)
-
         def controlCheck(cl, cc):
             if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
                     len(cl.symbolObj) == cc.symb) and (len(cl.gepointObj) == cc.points) and (len(cl.textObj) == cc.txt):
@@ -29,6 +28,7 @@ class ReadCadastralFile:
                 return "FAIL"
 
         self.CHECK = controlCheck(self.CadasterLayer, self.CadasterControl)
+        self.Buildings = Buildings(data, self.Header)
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -40,67 +40,70 @@ class HeaderLayer:
         rx_header = re.compile(
             "HEADER\s*VERSION\s+(\S+)\s*EKATTE\s+(.*)\s*NAME\s+(.*)\s*PROGRAM\s+(\S+)\s+V?(\S+)\s*DATE\s+(.*)\s*FIRM\s+(.*)\s*REFERENCE\s+(\S+)\s+(\S+)\s*WINDOW\s+(.*)\s*COORDTYPE\s+(\d+),(.*)\s*CONTENTS\s+(.*)\s*COMMENT\s+(.*)\s*END_HEADER",
             re.MULTILINE)
-        extractedHeader = rx_header.search(data)
-        a = extractedHeader.groups()
+        extract = rx_header.search(data).groups()
 
-        self.cadversion = a[0].replace("\r", "")
-        self.ekatte = a[1].replace("\r", "")
-        self.loc = a[2].replace("\r", "")
-        self.sw = a[3].replace("\r", "")
-        self.swv = a[4].replace("\r", "")
-        self.date = a[5].replace("\r", "")
-        self.firm = a[6].replace("\r", "")
+        self.cadversion = extract[0].replace("\r", "")
+        self.ekatte = extract[1].replace("\r", "")
+        self.loc = extract[2].replace("\r", "")
+        self.sw = extract[3].replace("\r", "")
+        self.swv = extract[4].replace("\r", "")
+        self.date = extract[5].replace("\r", "")
+        self.firm = extract[6].replace("\r", "")
 
-        self.refX = float(a[8].replace("\r", ""))
-        self.refY = float(a[7].replace("\r", ""))
-        self.window = a[9].replace("\r", "")
-        self.coordid = a[10].replace("\r", "")
-        self.coordidh = a[11].replace("\r", "")
-        self.content = a[12].replace("\r", "")
-        self.comments = a[13].replace("\r", "")
+        self.refX = float(extract[8].replace("\r", ""))
+        self.refY = float(extract[7].replace("\r", ""))
+        self.window = extract[9].replace("\r", "")
+        self.coordid = extract[10].replace("\r", "")
+        self.coordidh = extract[11].replace("\r", "")
+        self.content = extract[12].replace("\r", "")
+        self.comments = extract[13].replace("\r", "")
 
     def __getitem__(self, item):
         return getattr(self, item)
 
 
+def objectSearch(data):
+    rx_textobj = re.compile(
+        "^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+[LCR][TCD]\s+(?:(?:\"(.*)\"\s)?[CPLVSA]\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
+        re.MULTILINE)
+    rx_lineobj = re.compile(
+        "(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
+        re.MULTILINE)
+    rx_conobj = re.compile(
+        "C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:(?:\d+)\s+)*)",
+        re.MULTILINE)
+    rx_symbobj = re.compile(
+        "S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
+        re.MULTILINE)
+    rx_geopointobj = re.compile(
+        "P\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\"(.*)\"\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
+        re.MULTILINE)
+    lineObjectsStrings = rx_lineobj.finditer(data)
+    contObjectsStrings = rx_conobj.finditer(data)
+    geoPtObjectsStrings = rx_geopointobj.finditer(data)
+    textObjectsStrings = rx_textobj.finditer(data)
+    symbObjectsStrings = rx_symbobj.finditer(data)
+    return lineObjectsStrings, contObjectsStrings, geoPtObjectsStrings, textObjectsStrings, symbObjectsStrings
+
+
 class CadasterLayer:
     def __init__(self, data, hdr):
 
-        rx_LCadaster = re.compile("LAYER CADASTER([\s\S]*?)END_LAYER")
-        cadItem = rx_LCadaster.search(data).group()
-        rx_textobj = re.compile(
-            "^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+(L|C|R)(T|C|D)\s+(?:(?:\"(.*)\"\s)?(C|P|L|V|S|A)\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
-            re.MULTILINE)
-        rx_lineobj = re.compile(
-            "(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
-            re.MULTILINE)
-        rx_conobj = re.compile(
-            "C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:(?:\d+)\s+)*)",
-            re.MULTILINE)
-        rx_symbobj = re.compile(
-            "S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
-            re.MULTILINE)
-        rx_geopointobj = re.compile(
-            "P\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\"(.*)\"\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
-            re.MULTILINE)
+        rx_cadLayer = re.compile("LAYER CADASTER([\s\S]*?)END_LAYER")
+        extract = rx_cadLayer.search(data).group()
+        parse = objectSearch(extract)
 
-        textObjectsStrings = rx_textobj.finditer(cadItem)
-        lineObjectsStrings = rx_lineobj.finditer(cadItem)
+        if parse[0]:
+            self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
+        if parse[1]:
+            self.contourObj = [ContC(contour.groups(), hdr) for contour in parse[1]]
+        if parse[2]:
+            self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
+        if parse[3]:
+            self.textObj = [TextC(text.groups(), hdr) for text in parse[3]]
+        if parse[4]:
+            self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in parse[4]]
 
-        contObjectsStrings = rx_conobj.finditer(cadItem)
-        symbObjectsStrings = rx_symbobj.finditer(cadItem)
-
-        geoPtObjectsStrings = rx_geopointobj.finditer(cadItem)
-        if lineObjectsStrings:
-            self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
-        if contObjectsStrings:
-            self.contourObj = [ContC(contour.groups(), hdr) for contour in contObjectsStrings]
-        if textObjectsStrings:
-            self.textObj = [TextC(text.groups(), hdr) for text in textObjectsStrings]
-        if symbObjectsStrings:
-            self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in symbObjectsStrings]
-        if geoPtObjectsStrings:
-            self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in geoPtObjectsStrings]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -108,15 +111,63 @@ class CadasterLayer:
 
 class ControlCadastre:
     def __init__(self, data):
-        rx_controlCadaster = re.compile("CONTROL CADASTER([\S+\s+]*)END_CONTROL")
+        rx_controlCadaster = re.compile("CONTROL CADASTER([\S\s]*)END_CONTROL")
 
-        controlItem = rx_controlCadaster.search(data).group()
+        extract = rx_controlCadaster.search(data).group()
 
-        self.points = int(re.search(r"(?:NUMBER_POINTS\s+(\d+)\s+)", controlItem).group(1))
-        self.lines = int(re.search(r"(?:NUMBER_LINES\s+(\d+)\s+)", controlItem).group(1))
-        self.symb = int(re.search(r"(?:NUMBER_SYMBOLS\s+(\d+)\s+)", controlItem).group(1))
-        self.txt = int(re.search(r"(?:NUMBER_TEXTS\s+(\d+)\s+)", controlItem).group(1))
-        self.contours = int(re.search(r"(?:NUMBER_CONTURS\s+(\d+)\s+)", controlItem).group(1))
+        self.points = int(re.search(r"(?:NUMBER_POINTS\s+(\d+)\s+)", extract).group(1))
+        self.lines = int(re.search(r"(?:NUMBER_LINES\s+(\d+)\s+)", extract).group(1))
+        self.symb = int(re.search(r"(?:NUMBER_SYMBOLS\s+(\d+)\s+)", extract).group(1))
+        self.txt = int(re.search(r"(?:NUMBER_TEXTS\s+(\d+)\s+)", extract).group(1))
+        self.contours = int(re.search(r"(?:NUMBER_CONTURS\s+(\d+)\s+)", extract).group(1))
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class Buildings:
+    def __init__(self, data, hdr):
+
+        rx_LevelSchemasLayer = re.compile("LAYER SHEMI([\s\S]*?)END_LAYER")
+        rx_Levels = re.compile("ET\s+(\S+)\s+(\S+)\s+([\s\S]*?)END_ET")
+        extract = rx_Levels.finditer(rx_LevelSchemasLayer.search(data).group(0))
+        self.list = []
+        if extract:
+            for et in extract:
+                if not (et.group(1) in [bid.id for bid in self.list]):
+                    b = Building(et.group(1))
+                    b.addLevel(et.groups(), hdr)
+                    self.list.append(b)
+                else:
+                    self.list[[bid.id for bid in self.list].index(et.group(1))].addLevel(et.groups(),
+                                                                                         hdr)
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class Building:
+    def __init__(self, uid):
+        self.id = uid
+        self.levels = []
+
+    def addLevel(self, lvldata, hdr):
+        l = LevelObj(lvldata, hdr)
+        self.levels.append(l)
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class LevelObj:
+    def __init__(self, data, hdr):
+        self.lvl = data[1]
+        parse = objectSearch(data[2])
+
+        if parse[0]:
+            self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
+        if parse[1]:
+            self.contourObj = [ContC(contour.groups(), hdr) for contour in parse[1]]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -168,6 +219,8 @@ class ContC:
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
 
+    def __getitem__(self, item):
+        return getattr(self, item)
 
 class TextC:
     def __init__(self, array, hdr):
@@ -198,21 +251,6 @@ class TextC:
         return getattr(self, item)
 
 
-class SchemaLevelC:
-    def __init__(self, array, hdr):
-        self.level = array[0][1]
-        self.id = array[0][0]
-        self.storeyLines = []
-        for line in array[1]:
-            self.storeyLines.append(LineC(line))
-        self.storeyContours = []
-        for contour in array[2]:
-            self.storeyContours.append(ContC(contour))
-
-    def __getitem__(self, item):
-        return getattr(self, item)
-
-
 class GeoPointC:
     def __init__(self, array, hdr):
         self.type = array[0]
@@ -235,6 +273,8 @@ class GeoPointC:
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
 
+    def __getitem__(self, item):
+        return getattr(self, item)
 
 class SymbolC:
     def __init__(self, array, hdr):
@@ -249,6 +289,8 @@ class SymbolC:
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
 
+    def __getitem__(self, item):
+        return getattr(self, item)
 
 def opener(filename):
     if path.exists(filename[:-4] + "_cached.tcad"):
