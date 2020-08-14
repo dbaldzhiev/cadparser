@@ -312,11 +312,11 @@ def opener(filename):
 def translate(textbytes):
     goodText = ""
     print("TRANSLATION IN PROGRESS")
-    for i in tqdm(range(len(textbytes))):
-        if (textbytes[i] >= 128) and (textbytes[i] <= 191):
-            letter = str(mik.mikdict.get(textbytes[i]))
+    for txtbyte in tqdm(textbytes):
+        if (txtbyte >= 128) and (txtbyte <= 191):
+            letter = str(mik.mikdict.get(txtbyte))
         else:
-            letter = chr(textbytes[i])
+            letter = chr(txtbyte)
         goodText = goodText + letter
 
     return goodText
