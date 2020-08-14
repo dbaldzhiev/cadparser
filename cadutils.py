@@ -60,14 +60,17 @@ class CadasterLayer:
             "^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+(L|C|R)(T|C|D)\s+(?:(?:\"(.*)\"\s)?(C|P|L|V|S|A)\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
             re.MULTILINE)
         rx_lineobj = re.compile(
-            "(^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
+            "(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
             re.MULTILINE)
-        rx_conobj = re.compile("C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n((?:(?:\d+)\s+)*)", re.MULTILINE)
-        rx_symbobj = re.compile("S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))", re.MULTILINE)
+        rx_conobj = re.compile(
+            "C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n((?:(?:\d+)\s+)*)",
+            re.MULTILINE)
+        rx_symbobj = re.compile(
+            "S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
+            re.MULTILINE)
         rx_geopointobj = re.compile(
             "P\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\"(.*)\"\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
             re.MULTILINE)
-
 
         textObjectsStrings = rx_textobj.finditer(cadItem)
         lineObjectsStrings = rx_lineobj.finditer(cadItem)
@@ -77,8 +80,9 @@ class CadasterLayer:
 
         geoPtObjectsStrings = rx_geopointobj.finditer(cadItem)
 
-        if lineObjectsStrings:
-            self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
+        # self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
+        for line in lineObjectsStrings:
+            print(line)
         if contObjectsStrings:
             self.contourObj = [ContC(contour.groups(), hdr) for contour in contObjectsStrings]
         if textObjectsStrings:
@@ -100,7 +104,7 @@ class LineC:
         self.datecreated = str(array[4])
         self.datedestroyed = str(array[5])
         rx_ptlist = re.compile("(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+);")
-        self.ptlist = [LinecPt(p.groups(),hdr) for p in rx_ptlist.finditer(array[6])]
+        self.ptlist = [LinecPt(p.groups(), hdr) for p in rx_ptlist.finditer(array[6])]
         self.get_point_sequence = [pt.get_XY for pt in self.ptlist]
         self.get_referenced_point_sequence = [pt.get_XYR for pt in self.ptlist]
 
@@ -207,7 +211,7 @@ class GeoPointC:
 
 
 class SymbolC:
-    def __init__(self, array,hdr):
+    def __init__(self, array, hdr):
         self.type = array[0]
         self.id = array[1]
         self.posY = float(array[2])
