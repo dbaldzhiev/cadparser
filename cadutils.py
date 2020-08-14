@@ -14,9 +14,21 @@ logger = logging.getLogger(__name__)
 
 
 class ReadCadastralFile:
+
     def __init__(self, data):
+
         self.Header = HeaderLayer(data)
         self.CadasterLayer = CadasterLayer(data, self.Header)
+        self.CadasterControl = ControlCadastre(data)
+
+        def controlCheck(cl, cc):
+            if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
+                    len(cl.symbolObj) == cc.symb) and (len(cl.gepointObj) == cc.points) and (len(cl.textObj) == cc.txt):
+                return "PASS"
+            else:
+                return "FAIL"
+
+        self.CHECK = controlCheck(self.CadasterLayer, self.CadasterControl)
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -60,10 +72,10 @@ class CadasterLayer:
             "^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+(L|C|R)(T|C|D)\s+(?:(?:\"(.*)\"\s)?(C|P|L|V|S|A)\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
             re.MULTILINE)
         rx_lineobj = re.compile(
-            "(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
+            "(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
             re.MULTILINE)
         rx_conobj = re.compile(
-            "C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\n((?:(?:\d+)\s+)*)",
+            "C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:(?:\d+)\s+)*)",
             re.MULTILINE)
         rx_symbobj = re.compile(
             "S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
@@ -79,10 +91,8 @@ class CadasterLayer:
         symbObjectsStrings = rx_symbobj.finditer(cadItem)
 
         geoPtObjectsStrings = rx_geopointobj.finditer(cadItem)
-
-        # self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
-        for line in lineObjectsStrings:
-            print(line)
+        if lineObjectsStrings:
+            self.lineObj = [LineC(line.groups(), hdr) for line in lineObjectsStrings]
         if contObjectsStrings:
             self.contourObj = [ContC(contour.groups(), hdr) for contour in contObjectsStrings]
         if textObjectsStrings:
@@ -96,15 +106,31 @@ class CadasterLayer:
         return getattr(self, item)
 
 
+class ControlCadastre:
+    def __init__(self, data):
+        rx_controlCadaster = re.compile("CONTROL CADASTER([\S+\s+]*)END_CONTROL")
+
+        controlItem = rx_controlCadaster.search(data).group()
+
+        self.points = int(re.search(r"(?:NUMBER_POINTS\s+(\d+)\s+)", controlItem).group(1))
+        self.lines = int(re.search(r"(?:NUMBER_LINES\s+(\d+)\s+)", controlItem).group(1))
+        self.symb = int(re.search(r"(?:NUMBER_SYMBOLS\s+(\d+)\s+)", controlItem).group(1))
+        self.txt = int(re.search(r"(?:NUMBER_TEXTS\s+(\d+)\s+)", controlItem).group(1))
+        self.contours = int(re.search(r"(?:NUMBER_CONTURS\s+(\d+)\s+)", controlItem).group(1))
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
 class LineC:
     def __init__(self, array, hdr):
-        self.type = str(array[1])
-        self.lid = int(array[2])
-        self.bordertype = str(array[3])
-        self.datecreated = str(array[4])
-        self.datedestroyed = str(array[5])
+        self.type = str(array[0])
+        self.lid = int(array[1])
+        self.bordertype = str(array[2])
+        self.datecreated = str(array[3])
+        self.datedestroyed = str(array[4])
         rx_ptlist = re.compile("(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+);")
-        self.ptlist = [LinecPt(p.groups(), hdr) for p in rx_ptlist.finditer(array[6])]
+        self.ptlist = [LinecPt(p.groups(), hdr) for p in rx_ptlist.finditer(array[5])]
         self.get_point_sequence = [pt.get_XY for pt in self.ptlist]
         self.get_referenced_point_sequence = [pt.get_XYR for pt in self.ptlist]
 
