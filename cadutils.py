@@ -2,15 +2,12 @@
 # VERSION 2.00 STANDALONE
 # TESTED ON WINDOWS PYTHON 3.8.2
 
-import logging
 import re
 from os import path
 
 from tqdm import tqdm
 
 import mik
-
-logger = logging.getLogger(__name__)
 
 
 class ReadCadastralFile:
@@ -19,7 +16,10 @@ class ReadCadastralFile:
 
         self.Header = HeaderLayer(data)
         self.CadasterLayer = CadasterLayer(data, self.Header)
-        self.CadasterControl = ControlCadastre(data)
+        self.ControlCadastre = ControlLayer(data, "CADASTER")
+        self.ControlLeso = ControlLayer(data, "LESO")
+        self.ControlPochkateg = ControlLayer(data, "POCHKATEG")
+        self.ControlRegplan = ControlLayer(data, "REGPLAN")
 
         def controlCheck(cl, cc):
             if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
@@ -28,7 +28,7 @@ class ReadCadastralFile:
             else:
                 return "FAIL"
 
-        self.CHECK = controlCheck(self.CadasterLayer, self.CadasterControl)
+        self.CHECK = controlCheck(self.CadasterLayer, self.ControlCadastre)
         self.Buildings = Buildings(data, self.Header)
         self.Tables = Semantic(data)
 
@@ -64,29 +64,6 @@ class HeaderLayer:
         return getattr(self, item)
 
 
-def objectSearch(data):
-    rx_textobj = re.compile(
-        r"^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+([LCR])([TCD])\s+(?:(?:\"(.*)\"\s)?([CPLVSA])\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
-        re.MULTILINE)
-    rx_lineobj = re.compile(
-        r"(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
-        re.MULTILINE)
-    rx_conobj = re.compile(
-        r"C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:(?:\d+)\s+)*)",
-        re.MULTILINE)
-    rx_symbobj = re.compile(
-        r"S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
-        re.MULTILINE)
-    rx_geopointobj = re.compile(
-        r"P\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\"(.*)\"\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
-        re.MULTILINE)
-    lineObjectsStrings = rx_lineobj.finditer(data)
-    contObjectsStrings = rx_conobj.finditer(data)
-    geoPtObjectsStrings = rx_geopointobj.finditer(data)
-    textObjectsStrings = rx_textobj.finditer(data)
-    symbObjectsStrings = rx_symbobj.finditer(data)
-    return lineObjectsStrings, contObjectsStrings, geoPtObjectsStrings, textObjectsStrings, symbObjectsStrings
-
 
 class CadasterLayer:
     def __init__(self, data, hdr):
@@ -110,9 +87,9 @@ class CadasterLayer:
         return getattr(self, item)
 
 
-class ControlCadastre:
-    def __init__(self, data):
-        rx_controlCadaster = re.compile(r"CONTROL CADASTER([\S\s]*)END_CONTROL")
+class ControlLayer:
+    def __init__(self, data, controlType):
+        rx_controlCadaster = re.compile(r"CONTROL " + controlType + "([\S\s]*)END_CONTROL")
 
         extract = rx_controlCadaster.search(data).group()
 
@@ -301,7 +278,7 @@ class Semantic:
         self.Tables = []
 
         for tablematch in rx_table.finditer(data):
-            self.Tables.append(Table(tablematch))
+            self.Tables.append(Table(tablematch.groups()))
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -309,9 +286,37 @@ class Semantic:
 
 class Table:
     def __init__(self, match):
-        self.name = match.group(1)
-        b = match.group(2)
-        print("a")
+        self.name = match[0]
+        tableBody = match[1]
+        rx_fields = re.compile(r"^F\s+(\S+)\s+([CNSLDBT])\s+(\d{1,2})\s+(\d)(?:\s+([123]))?(?:\s+(\S+))*?$",
+                               re.MULTILINE)
+        self.fields = [Field(found_field.groups()) for found_field in rx_fields.finditer(tableBody)]
+        field_types = {
+            "C": "\s*\\\"(.*?)\\\"\s*",
+            "S": "(.*?)",
+            "N": "(.*?)",
+            "L": "(.*?)",
+            "B": "([TF])",
+            "D": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
+            "T": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
+        }
+        regex_entrys = "^D\s*"
+        for f in self.fields:
+
+            ent = field_types.__getitem__(f.type)
+            if not (regex_entrys is "^D\s*"):
+                ent = "," + ent
+            else:
+                rx_check = re.compile(regex_entrys + ent, re.MULTILINE)
+
+            regex_entrys = regex_entrys + ent
+        rx_entrys = re.compile(regex_entrys, re.MULTILINE)
+        self.entrys = [en.groups() for en in rx_entrys.finditer(match[1])]
+        checker = [chk.groups() for chk in rx_check.finditer(match[1])]
+        if len(self.entrys) == len(checker):
+            self.CHECK = "PASS"
+        else:
+            self.CHECK = "FAIL"
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -319,9 +324,39 @@ class Table:
 
 class Field:
     def __init__(self, data):
+        self.name = data[0]
+        self.type = data[1]
+        self.length = data[2]
+        self.dec = data[3]
+        self.flag = data[4]
+        self.tableref = data[5]
 
     def __getitem__(self, item):
         return getattr(self, item)
+
+
+def objectSearch(data):
+    rx_textobj = re.compile(
+        r"^T\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s(\S+)\s+(\S+)\s+(\S+)\s+([LCR])([TCD])\s+(?:(?:\"(.*)\"\s)?([CPLVSA])\s+(\S+)\s(AN|SI|NU|LE|XC|YC|HI|AR|LP|AD|ST|IO)\s)?\"(.*)\"",
+        re.MULTILINE)
+    rx_lineobj = re.compile(
+        r"(?:^L\s+(\d+)\s+(\d+)\s+(\d+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+)((?:(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+)\s+(?:\S+);(?:\s+)?)*)",
+        re.MULTILINE)
+    rx_conobj = re.compile(
+        r"C\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:(?:\d+)\s+)*)",
+        re.MULTILINE)
+    rx_symbobj = re.compile(
+        r"S\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
+        re.MULTILINE)
+    rx_geopointobj = re.compile(
+        r"P\s+(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(?:(\d+(?:.\d+)*)|(?:0))\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+\"(.*)\"\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))\s+((?:\d{1,2}\.\d{1,2}\.\d{2,4})|(?:0))",
+        re.MULTILINE)
+    lineObjectsStrings = rx_lineobj.finditer(data)
+    contObjectsStrings = rx_conobj.finditer(data)
+    geoPtObjectsStrings = rx_geopointobj.finditer(data)
+    textObjectsStrings = rx_textobj.finditer(data)
+    symbObjectsStrings = rx_symbobj.finditer(data)
+    return lineObjectsStrings, contObjectsStrings, geoPtObjectsStrings, textObjectsStrings, symbObjectsStrings
 
 
 def opener(filename):
