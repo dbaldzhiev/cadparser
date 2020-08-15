@@ -30,6 +30,7 @@ class ReadCadastralFile:
 
         self.CHECK = controlCheck(self.CadasterLayer, self.CadasterControl)
         self.Buildings = Buildings(data, self.Header)
+        self.Tables = Semantic(data)
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -289,6 +290,35 @@ class SymbolC:
         self.datedestroyed = array[7]
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class Semantic:
+    def __init__(self, data):
+        rx_table = re.compile(r"^TABLE\s+(\S+)\s+([\s\S]*?)END_TABLE", re.MULTILINE)
+        self.Tables = []
+
+        for tablematch in rx_table.finditer(data):
+            self.Tables.append(Table(tablematch))
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class Table:
+    def __init__(self, match):
+        self.name = match.group(1)
+        b = match.group(2)
+        print("a")
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class Field:
+    def __init__(self, data):
 
     def __getitem__(self, item):
         return getattr(self, item)
