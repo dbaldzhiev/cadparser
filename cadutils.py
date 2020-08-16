@@ -78,15 +78,20 @@ class CadasterLayer:
         parse = objectSearch(extract)
 
         if parse[0]:
-            self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
+            self.lineObj = [LineC(line.groups(), hdr) for line in
+                            tqdm(tuple(parse[0]), desc="Parsing lines: ", leave=True)]
         if parse[1]:
-            self.contourObj = [ContC(contour.groups(), hdr) for contour in parse[1]]
+            self.contourObj = [ContC(contour.groups(), hdr) for contour in
+                               tqdm(tuple(parse[1]), desc="Parsing contours: ", leave=True)]
         if parse[2]:
-            self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
+            self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in
+                               tqdm(tuple(parse[2]), desc="Parsing geo-points: ", leave=True)]
         if parse[3]:
-            self.textObj = [TextC(text.groups(), hdr) for text in parse[3]]
+            self.textObj = [TextC(text.groups(), hdr) for text in
+                            tqdm(tuple(parse[3]), desc="Parsing texts: ", leave=True)]
         if parse[4]:
-            self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in parse[4]]
+            self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in
+                              tqdm(tuple(parse[4]), desc="Parsing symbols: ", leave=True)]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -113,10 +118,10 @@ class Buildings:
 
         rx_LevelSchemasLayer = re.compile(r"LAYER SHEMI([\s\S]*?)END_LAYER")
         rx_Levels = re.compile(r"ET\s+(\S+)\s+(\S+)\s+([\s\S]*?)END_ET")
-        extract = rx_Levels.finditer(rx_LevelSchemasLayer.search(data).group(0))
+        extract = tuple(rx_Levels.finditer(rx_LevelSchemasLayer.search(data).group(0)))
         self.list = []
         if extract:
-            for et in extract:
+            for et in tqdm(extract, desc='Populating building list: ', leave=True):
                 if not (et.group(1) in [bid.id for bid in self.list]):
                     b = Building(et.group(1))
                     b.addLevel(et.groups(), hdr)
@@ -282,7 +287,7 @@ class Semantic:
         rx_table = re.compile(r"^TABLE\s+(\S+)\s+([\s\S]*?)END_TABLE", re.MULTILINE)
         self.Tables = []
 
-        for tablematch in rx_table.finditer(data):
+        for tablematch in tqdm(tuple(rx_table.finditer(data)), desc="Processing tables", leave=True):
             self.Tables.append(Table(tablematch.groups()))
 
     def __getitem__(self, item):
@@ -306,17 +311,19 @@ class Table:
             "T": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
         }
         regex_entrys = "^D\s*"
-        for f in self.fields:
 
+        rx_check = re.compile(regex_entrys + field_types.__getitem__(self.fields[0].type), re.MULTILINE)
+        for f in self.fields:
             ent = field_types.__getitem__(f.type)
-            if not (regex_entrys is "^D\s*"):
+            if regex_entrys != "^D\s*":
                 ent = "," + ent
-            else:
-                rx_check = re.compile(regex_entrys + ent, re.MULTILINE)
+            # else:
+            # rx_check = re.compile(regex_entrys + ent, re.MULTILINE)
 
             regex_entrys = regex_entrys + ent
         rx_entrys = re.compile(regex_entrys, re.MULTILINE)
         self.entrys = [en.groups() for en in rx_entrys.finditer(match[1])]
+
         checker = [chk.groups() for chk in rx_check.finditer(match[1])]
         if len(self.entrys) == len(checker):
             self.check = True
