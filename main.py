@@ -24,4 +24,4 @@ except getopt.GetoptError:
 if __name__ == '__main__':
     cadFileText = cadutils.opener(filename)
     cadfileItems = cadutils.ReadCadastralFile(cadFileText)
-    print(cadfileItems.CHECK)
+    print("a")

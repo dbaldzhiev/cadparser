@@ -20,17 +20,22 @@ class ReadCadastralFile:
         self.ControlLeso = ControlLayer(data, "LESO")
         self.ControlPochkateg = ControlLayer(data, "POCHKATEG")
         self.ControlRegplan = ControlLayer(data, "REGPLAN")
+        self.Buildings = Buildings(data, self.Header)
+        self.Tables = Semantic(data)
 
         def controlCheck(cl, cc):
             if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
                     len(cl.symbolObj) == cc.symb) and (len(cl.gepointObj) == cc.points) and (len(cl.textObj) == cc.txt):
-                return "PASS"
+                print("CADASTER OK")
+                if all(tb.check for tb in self.Tables.Tables):
+                    return print("TABLES OK")
+                else:
+                    return print("TABLES FAIL")
             else:
-                return "FAIL"
+                return print("CADASTER FAIL")
 
         self.CHECK = controlCheck(self.CadasterLayer, self.ControlCadastre)
-        self.Buildings = Buildings(data, self.Header)
-        self.Tables = Semantic(data)
+
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -314,9 +319,9 @@ class Table:
         self.entrys = [en.groups() for en in rx_entrys.finditer(match[1])]
         checker = [chk.groups() for chk in rx_check.finditer(match[1])]
         if len(self.entrys) == len(checker):
-            self.CHECK = "PASS"
+            self.check = True
         else:
-            self.CHECK = "FAIL"
+            self.check = False
 
     def __getitem__(self, item):
         return getattr(self, item)
