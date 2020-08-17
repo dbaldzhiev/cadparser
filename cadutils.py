@@ -16,25 +16,18 @@ class ReadCadastralFile:
 
         self.Header = HeaderLayer(data)
         self.CadasterLayer = CadasterLayer(data, self.Header)
-        self.ControlCadastre = ControlLayer(data, "CADASTER")
-        self.ControlLeso = ControlLayer(data, "LESO")
-        self.ControlPochkateg = ControlLayer(data, "POCHKATEG")
-        self.ControlRegplan = ControlLayer(data, "REGPLAN")
+        self.ControlLayers = ControlLayers(data)
         self.Buildings = Buildings(data, self.Header)
         self.Tables = Semantic(data)
 
-        def controlCheck(cl, cc):
-            if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
-                    len(cl.symbolObj) == cc.symb) and (len(cl.gepointObj) == cc.points) and (len(cl.textObj) == cc.txt):
-                print("CADASTER OK")
-                if all(tb.check for tb in self.Tables.Tables):
-                    return print("TABLES OK")
-                else:
-                    return print("TABLES FAIL")
-            else:
-                return print("CADASTER FAIL")
+        try:
+            ccl_indx = [m.id for m in self.ControlLayers.ControlCheckLayers].index("CADASTER")
+            cc = self.ControlLayers.ControlCheckLayers[ccl_indx]
+            self.CADASTERCHECK = controlCheck(self.CadasterLayer, cc, self.Tables)
+        except Exception:
+            self.CADASTERCHECK = "Fail"
 
-        self.CHECK = controlCheck(self.CadasterLayer, self.ControlCadastre)
+
 
 
     def __getitem__(self, item):
@@ -74,40 +67,49 @@ class CadasterLayer:
     def __init__(self, data, hdr):
 
         rx_cadLayer = re.compile(r"LAYER CADASTER([\s\S]*?)END_LAYER")
-        extract = rx_cadLayer.search(data).group()
-        parse = objectSearch(extract)
+        extract = rx_cadLayer.search(data)
+        if extract:
+            parse = objectSearch(extract.group())
 
-        if parse[0]:
-            self.lineObj = [LineC(line.groups(), hdr) for line in
-                            tqdm(tuple(parse[0]), desc="Parsing lines: ", leave=True)]
-        if parse[1]:
-            self.contourObj = [ContC(contour.groups(), hdr) for contour in
-                               tqdm(tuple(parse[1]), desc="Parsing contours: ", leave=True)]
-        if parse[2]:
-            self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in
-                               tqdm(tuple(parse[2]), desc="Parsing geo-points: ", leave=True)]
-        if parse[3]:
-            self.textObj = [TextC(text.groups(), hdr) for text in
-                            tqdm(tuple(parse[3]), desc="Parsing texts: ", leave=True)]
-        if parse[4]:
-            self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in
-                              tqdm(tuple(parse[4]), desc="Parsing symbols: ", leave=True)]
+            if parse[0]:
+                self.lineObj = [LineC(line.groups(), hdr) for line in
+                                tqdm(tuple(parse[0]), desc="Parsing lines: ", leave=True)]
+            if parse[1]:
+                self.contourObj = [ContC(contour.groups(), hdr) for contour in
+                                   tqdm(tuple(parse[1]), desc="Parsing contours: ", leave=True)]
+            if parse[2]:
+                self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in
+                                   tqdm(tuple(parse[2]), desc="Parsing geo-points: ", leave=True)]
+            if parse[3]:
+                self.textObj = [TextC(text.groups(), hdr) for text in
+                                tqdm(tuple(parse[3]), desc="Parsing texts: ", leave=True)]
+            if parse[4]:
+                self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in
+                                  tqdm(tuple(parse[4]), desc="Parsing symbols: ", leave=True)]
+
+    def __getitem__(self, item):
+        return getattr(self, item)
+
+
+class ControlLayers:
+    def __init__(self, data):
+        rx_controlCadaster = re.compile(r"^CONTROL\s+(\S+)\s+([\S\s]*?)END_CONTROL", re.MULTILINE)
+
+        self.ControlCheckLayers = [ControlLayer(cl.groups()) for cl in rx_controlCadaster.finditer(data)]
 
     def __getitem__(self, item):
         return getattr(self, item)
 
 
 class ControlLayer:
-    def __init__(self, data, controlType):
-        rx_controlCadaster = re.compile(r"CONTROL " + controlType + "([\S\s]*)END_CONTROL")
+    def __init__(self, data):
+        self.id = data[0]
 
-        extract = rx_controlCadaster.search(data).group()
-
-        self.points = int(re.search(r"(?:NUMBER_POINTS\s+(\d+)\s+)", extract).group(1))
-        self.lines = int(re.search(r"(?:NUMBER_LINES\s+(\d+)\s+)", extract).group(1))
-        self.symb = int(re.search(r"(?:NUMBER_SYMBOLS\s+(\d+)\s+)", extract).group(1))
-        self.txt = int(re.search(r"(?:NUMBER_TEXTS\s+(\d+)\s+)", extract).group(1))
-        self.contours = int(re.search(r"(?:NUMBER_CONTURS\s+(\d+)\s+)", extract).group(1))
+        self.points = int(re.search(r"(?:NUMBER_POINTS\s+(\d+)\s+)", data[1]).group(1))
+        self.lines = int(re.search(r"(?:NUMBER_LINES\s+(\d+)\s+)", data[1]).group(1))
+        self.symb = int(re.search(r"(?:NUMBER_SYMBOLS\s+(\d+)\s+)", data[1]).group(1))
+        self.txt = int(re.search(r"(?:NUMBER_TEXTS\s+(\d+)\s+)", data[1]).group(1))
+        self.contours = int(re.search(r"(?:NUMBER_CONTURS\s+(\d+)\s+)", data[1]).group(1))
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -118,17 +120,21 @@ class Buildings:
 
         rx_LevelSchemasLayer = re.compile(r"LAYER SHEMI([\s\S]*?)END_LAYER")
         rx_Levels = re.compile(r"ET\s+(\S+)\s+(\S+)\s+([\s\S]*?)END_ET")
-        extract = tuple(rx_Levels.finditer(rx_LevelSchemasLayer.search(data).group(0)))
-        self.list = []
+        extract = rx_LevelSchemasLayer.search(data)
         if extract:
-            for et in tqdm(extract, desc='Populating building list: ', leave=True):
-                if not (et.group(1) in [bid.id for bid in self.list]):
-                    b = Building(et.group(1))
-                    b.addLevel(et.groups(), hdr)
-                    self.list.append(b)
-                else:
-                    self.list[[bid.id for bid in self.list].index(et.group(1))].addLevel(et.groups(),
-                                                                                         hdr)
+            extract = rx_Levels.finditer(extract.group(0))
+            if extract:
+                extract = tuple(extract)
+                self.list = []
+                if extract:
+                    for et in tqdm(extract, desc='Populating building list: ', leave=True):
+                        if not (et.group(1) in [bid.id for bid in self.list]):
+                            b = Building(et.group(1))
+                            b.addLevel(et.groups(), hdr)
+                            self.list.append(b)
+                        else:
+                            self.list[[bid.id for bid in self.list].index(et.group(1))].addLevel(et.groups(),
+                                                                                                 hdr)
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -306,29 +312,29 @@ class Table:
             "S": "(.*?)",
             "N": "(.*?)",
             "L": "(.*?)",
-            "B": "([TF])",
+            "B": "([TF]?)",
             "D": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
             "T": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
         }
-        regex_entrys = "^D\s*"
+        if self.fields:
+            regex_entrys = "^D\s*"
+            rx_check = re.compile(regex_entrys + field_types.__getitem__(self.fields[0].type), re.MULTILINE)
+            for f in self.fields:
+                ent = field_types.__getitem__(f.type)
+                if regex_entrys != "^D\s*":
+                    ent = "," + ent
+                regex_entrys = regex_entrys + ent
 
-        rx_check = re.compile(regex_entrys + field_types.__getitem__(self.fields[0].type), re.MULTILINE)
-        for f in self.fields:
-            ent = field_types.__getitem__(f.type)
-            if regex_entrys != "^D\s*":
-                ent = "," + ent
-            # else:
-            # rx_check = re.compile(regex_entrys + ent, re.MULTILINE)
+            rx_entrys = re.compile(regex_entrys, re.MULTILINE)
+            self.entrys = [en.groups() for en in rx_entrys.finditer(match[1])]
 
-            regex_entrys = regex_entrys + ent
-        rx_entrys = re.compile(regex_entrys, re.MULTILINE)
-        self.entrys = [en.groups() for en in rx_entrys.finditer(match[1])]
-
-        checker = [chk.groups() for chk in rx_check.finditer(match[1])]
-        if len(self.entrys) == len(checker):
-            self.check = True
+            checker = [chk.groups() for chk in rx_check.finditer(match[1])]
+            if len(self.entrys) == len(checker):
+                self.check = True
+            else:
+                self.check = False
         else:
-            self.check = False
+            self.check = "TABLE WITHOUT FIELDS"
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -383,7 +389,7 @@ def opener(filename):
         ff = open(filename[:-4] + "_cached.tcad", "x", encoding="utf-8")
         ff.write(cadText)
         ff.close()
-    return cadText
+    return cadText.replace("\r\n", "\n")
 
 
 def translate(textbytes):
@@ -397,3 +403,20 @@ def translate(textbytes):
         goodText = goodText + letter
 
     return goodText
+
+
+def controlCheck(cl, cc, tb):
+    if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
+            len(cl.symbolObj) == cc.symb) and (len(cl.gepointObj) == cc.points) and (len(cl.textObj) == cc.txt):
+        chk_cad = True
+    else:
+        chk_cad = False
+
+    if len(tb.Tables) > 0:
+        if all(tb.check for tb in tb.Tables):
+            chk_tb = True
+        else:
+            chk_tb = False
+    else:
+        chk_tb = "N/A"
+    return (chk_cad, chk_tb)
