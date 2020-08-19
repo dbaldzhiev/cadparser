@@ -5,8 +5,6 @@
 import re
 from os import path
 
-from tqdm import tqdm
-
 import mik
 
 
@@ -26,9 +24,6 @@ class ReadCadastralFile:
             self.CADASTERCHECK = controlCheck(self.CadasterLayer, cc, self.Tables)
         except Exception:
             self.CADASTERCHECK = "Fail"
-
-
-
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -62,7 +57,6 @@ class HeaderLayer:
         return getattr(self, item)
 
 
-
 class CadasterLayer:
     def __init__(self, data, hdr):
 
@@ -72,20 +66,15 @@ class CadasterLayer:
             parse = objectSearch(extract.group())
 
             if parse[0]:
-                self.lineObj = [LineC(line.groups(), hdr) for line in
-                                tqdm(tuple(parse[0]), desc="Parsing lines: ", leave=True)]
+                self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
             if parse[1]:
-                self.contourObj = [ContC(contour.groups(), hdr) for contour in
-                                   tqdm(tuple(parse[1]), desc="Parsing contours: ", leave=True)]
+                self.contourObj = [ContC(contour.groups(), hdr) for contour in parse[1]]
             if parse[2]:
-                self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in
-                                   tqdm(tuple(parse[2]), desc="Parsing geo-points: ", leave=True)]
+                self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
             if parse[3]:
-                self.textObj = [TextC(text.groups(), hdr) for text in
-                                tqdm(tuple(parse[3]), desc="Parsing texts: ", leave=True)]
+                self.textObj = [TextC(text.groups(), hdr) for text in parse[3]]
             if parse[4]:
-                self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in
-                                  tqdm(tuple(parse[4]), desc="Parsing symbols: ", leave=True)]
+                self.symbolObj = [SymbolC(symb.groups(), hdr) for symb in parse[4]]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -127,7 +116,7 @@ class Buildings:
                 extract = tuple(extract)
                 self.list = []
                 if extract:
-                    for et in tqdm(extract, desc='Populating building list: ', leave=True):
+                    for et in extract:
                         if not (et.group(1) in [bid.id for bid in self.list]):
                             b = Building(et.group(1))
                             b.addLevel(et.groups(), hdr)
@@ -293,7 +282,7 @@ class Semantic:
         rx_table = re.compile(r"^TABLE\s+(\S+)\s+([\s\S]*?)END_TABLE", re.MULTILINE)
         self.Tables = []
 
-        for tablematch in tqdm(tuple(rx_table.finditer(data)), desc="Processing tables", leave=True):
+        for tablematch in rx_table.finditer(data):
             self.Tables.append(Table(tablematch.groups()))
 
     def __getitem__(self, item):
@@ -392,18 +381,12 @@ def opener(filename):
     return cadText.replace("\r\n", "\n")
 
 
-def translate(textbytes):
-    goodText = ""
-    print("TRANSLATION IN PROGRESS")
-    for txtbyte in tqdm(textbytes):
-        if (txtbyte >= 128) and (txtbyte <= 191):
-            letter = str(mik.mikdict.get(txtbyte))
-        else:
-            letter = chr(txtbyte)
-        goodText = goodText + letter
-
-    return goodText
-
+def translate(input):
+    newChars = map(
+        lambda x: bytes([x]) if (x < 128) else bytes(mik.mikdict.get(x), "utf-8") if (x <= 191) and (x >= 128) else b"",
+        input)
+    res = b''.join(newChars).decode("utf-8")
+    return res
 
 def controlCheck(cl, cc, tb):
     if (len(cl.lineObj) == cc.lines) and (len(cl.contourObj) == cc.contours) and (
@@ -419,4 +402,4 @@ def controlCheck(cl, cc, tb):
             chk_tb = False
     else:
         chk_tb = "N/A"
-    return (chk_cad, chk_tb)
+    return chk_cad, chk_tb

@@ -1,7 +1,7 @@
 import getopt
 import sys
 
-import test
+import cadutils
 
 # Get the arguments from the command-line except the filename
 argv = sys.argv[1:]
@@ -22,8 +22,8 @@ except getopt.GetoptError:
     sys.exit(2)
 
 if __name__ == '__main__':
-    # cadFileText = cadutils.opener(filename)
-    # cadfileItems = cadutils.ReadCadastralFile(cadFileText)
-    a = test.tests()
+    cadFileText = cadutils.opener(filename)
+    cadfileItems = cadutils.ReadCadastralFile(cadFileText)
+    # a = test.tests()
 
-    print("a")
+    print("ab")
