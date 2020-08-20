@@ -4,7 +4,7 @@ import cadutils
 
 
 def tests():
-    dir = ".\\testdata\\source"
+    dir = "./testdata"
     testfiles = []
     for file in os.listdir(dir):
         if file.endswith(".cad"):
@@ -13,7 +13,10 @@ def tests():
 
     CF = []
     for t in testfiles:
-        CF.append(cadutils.ReadCadastralFile(cadutils.opener(t)))
+        try:
+            CF.append(cadutils.ReadCadastralFile(cadutils.opener(t)))
+        except Exception:
+            pass
 
     for i in range(len(CF)):
         # print("File {0} Cadaster {1} and Tables {2}".format(testfiles[i],CF[i].CADASTERCHECK[0],CF[i].CADASTERCHECK[1]))

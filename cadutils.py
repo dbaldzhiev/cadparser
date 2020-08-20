@@ -11,7 +11,6 @@ import mik
 class ReadCadastralFile:
 
     def __init__(self, data):
-
         self.Header = HeaderLayer(data)
         self.CadasterLayer = CadasterLayer(data, self.Header)
         self.ControlLayers = ControlLayers(data)
