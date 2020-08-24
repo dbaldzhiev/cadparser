@@ -67,7 +67,7 @@ class CadasterLayer:
             if parse[0]:
                 self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
             if parse[1]:
-                self.contourObj = [ContC(contour.groups(), hdr) for contour in parse[1]]
+                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj) for contour in parse[1]]
             if parse[2]:
                 self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
             if parse[3]:
@@ -148,7 +148,7 @@ class LevelObj:
         if parse[0]:
             self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
         if parse[1]:
-            self.contourObj = [ContC(contour.groups(), hdr) for contour in parse[1]]
+            self.contourObj = [ContC(contour.groups(), hdr, self.lineObj) for contour in parse[1]]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -188,15 +188,37 @@ class LinecPt:
 
 
 class ContC:
-    def __init__(self, array, hdr):
-        self.type = array[0]
-        self.cid = array[1]
-        self.posY = float(array[2])
-        self.posX = float(array[3])
-        self.datecreated = array[4]
-        self.datedestroyed = array[5]
+    def polygonize(self,linestringarray):
+        pgon = []
+        for ls in linestringarray:
+            ls_rev = ls[]
+            if len(pgon) == 0:
+                pgon.extend(ls)
+            if len(pgon) > 0:
+                if pgon[-1] == ls[0]:
+                    pgon.extend(ls)
+                if pgon[-1] == ls[-1]:
+                    pgon.extend(ls[::-1])
+                if pgon[0] == ls[0]:
+                    pgon = pgon[::-1]
+                    pgon.extend(ls[0])
+        print("complete")
+        return pgon
+
+    def __init__(self, cArray, hdr, lines):
+        self.type = cArray[0]
+        self.cid = cArray[1]
+        self.posY = float(cArray[2])
+        self.posX = float(cArray[3])
+        self.datecreated = cArray[4]
+        self.datedestroyed = cArray[5]
         rx_contid = re.compile(r"(\d+)")
-        self.ids = rx_contid.findall(array[6])
+        self.ids = list(map(int, rx_contid.findall(cArray[6])))
+        ll = [ln.lid for ln in lines]
+        self.linelistbase = [l.get_referenced_point_sequence for l in [lines[ll.index(i)] for i in self.ids]]
+        self.lineslist = self.polygonize([l.get_referenced_point_sequence for l in [lines[ll.index(i)] for i in self.ids]])
+        #self.lineslist2 = [item for sublist in [l.get_referenced_point_sequence for l in [lines[ll.index(i)] for i in self.ids]] for item in sublist]
+
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
 
