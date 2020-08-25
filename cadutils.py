@@ -5,8 +5,6 @@
 import re
 from os import path
 
-import matplotlib.pyplot as plt
-
 import mik
 
 
@@ -176,10 +174,7 @@ class LineC:
         self.ptlist = [LinecPt(p.groups(), hdr) for p in rx_ptlist.finditer(array[5])]
         self.get_point_sequence = [pt.get_XY for pt in self.ptlist]
         self.get_referenced_point_sequence = [pt.get_XYR for pt in self.ptlist]
-        if len(self.get_point_sequence) != len(self.get_referenced_point_sequence):
-            print("problem")
-        if self.lid == 19757830:
-            print("test")
+
     def __getitem__(self, item):
         return getattr(self, item)
 
@@ -214,11 +209,6 @@ class ContC:
     def polygonize(self, linestringarray):
         pgon = []
         lls = linestringarray.copy()
-        plt.figure()
-        for ls_temp in lls:
-            plt.plot([x[0] for x in ls_temp], [y[1] for y in ls_temp])
-
-        # plt.show()
         try:
             while len(lls) > 0:
                 if len(pgon) == 0:
@@ -246,10 +236,9 @@ class ContC:
                                 pgon.extend(currentLine[::-1])  ## append reversed line
                                 del lls[lls.index(currentLine)]
                                 app = 1
-                    if app == 0:
-                        print("didnt do shit")
 
-            print("VALID PGON")
+
+
         except Exception as e:
             print(e)
             print("INVALID PGON")
@@ -263,26 +252,26 @@ class ContC:
         self.datecreated = cArray[4]
         self.datedestroyed = cArray[5]
         rx_contid = re.compile(r"(\d+)")
-        self.all_ids = list(map(int, rx_contid.findall(cArray[6])))
-        self.pgon_ids = set(self.all_ids)
-        self.holes = []
-        if self.cid in nests:
-            for ncon in nests.get(self.cid):
-                nli = set(cdicmap.get(ncon))
-                self.pgon_ids.difference(nli)
-                self.holes.append(list(nli))
-        self.pgon_ids = list(self.pgon_ids)
+        self.pgon_ids = list(map(int, rx_contid.findall(cArray[6])))
+        # if self.cid in nests:
+        #    for ncon in nests.get(self.cid):
+        #         nli = set(cdicmap.get(ncon))
+        #        self.holes.append(list(nli))
 
         ll = [ln.lid for ln in lines]
-        self.lineslist = self.polygonize(
+        self.pgon_ext = self.polygonize(
             [l.get_referenced_point_sequence.copy() for l in [lines[ll.index(i)] for i in self.pgon_ids]])
+
+        if self.cid in nests:
+            self.holes = [cdicmap.get(ncon) for ncon in nests.get(self.cid)]
+            hh = [[lines[ll.index(hls)].get_referenced_point_sequence for hls in h] for h in self.holes]
+            self.pgon_holes = self.polygonize(hh)
+        else:
+            self.pgon_holes = []
 
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
-        plt.suptitle(self.cid, fontsize=16)
-        #        plt.text([a for a in self.all_ids])
 
-        plt.show()
     def __getitem__(self, item):
         return getattr(self, item)
 
@@ -295,7 +284,6 @@ class TextC:
         self.posX = float(array[3])
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
-
         self.posH = float(array[4])
         self.datecreated = array[5]
         self.datedestroyed = array[6]
@@ -303,9 +291,7 @@ class TextC:
         self.rotdeg = (100 - float(array[7])) * 180.0 / 200.0
         self.halign = str(array[8])
         self.valign = str(array[9])
-
         self.prefixtext = str(array[10])
-
         self.objtype = str(array[11])
         self.graphicid = str(array[12])
         self.grapicparam = str(array[13])

@@ -1,6 +1,8 @@
 import getopt
 import sys
 
+import matplotlib.pyplot as plt
+
 import cadutils
 
 # Get the arguments from the command-line except the filename
@@ -24,6 +26,14 @@ except getopt.GetoptError:
 if __name__ == '__main__':
     cadFileText = cadutils.opener(filename)
     cadfileItems = cadutils.ReadCadastralFile(cadFileText)
-    # a = test.tests()
 
+    for con in cadfileItems.CadasterLayer.contourObj:
+        plt.figure()
+        plt.suptitle(con.cid, fontsize=16)
+        plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
+        if len(con.pgon_holes) > 0:
+            plt.plot([x[0] for x in con.pgon_holes], [y[1] for y in con.pgon_holes])
+
+    plt.show()
+    # a = test.tests()
     print("ab")
