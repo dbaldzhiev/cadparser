@@ -5,6 +5,8 @@
 import re
 from os import path
 
+import matplotlib.pyplot as plt
+
 import mik
 
 
@@ -12,8 +14,9 @@ class ReadCadastralFile:
 
     def __init__(self, data):
         self.Header = HeaderLayer(data)
-        self.CadasterLayer = CadasterLayer(data, self.Header)
         self.ControlLayers = ControlLayers(data)
+        self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[
+            [c.id for c in self.ControlLayers.ControlCheckLayers].index("CADASTER")].nested)
         self.Buildings = Buildings(data, self.Header)
         self.Tables = Semantic(data)
 
@@ -57,7 +60,7 @@ class HeaderLayer:
 
 
 class CadasterLayer:
-    def __init__(self, data, hdr):
+    def __init__(self, data, hdr, nests):
 
         rx_cadLayer = re.compile(r"LAYER CADASTER([\s\S]*?)END_LAYER")
         extract = rx_cadLayer.search(data)
@@ -65,9 +68,12 @@ class CadasterLayer:
             parse = objectSearch(extract.group())
 
             if parse[0]:
-                self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
+                lineparse = list(parse[0])
+                self.lineObj = [LineC(line.groups(), hdr) for line in lineparse]
             if parse[1]:
-                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj) for contour in parse[1]]
+                contparse = list(parse[1])
+                CDic = ContourDictBuilder(contparse)
+                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, nests, CDic) for contour in contparse]
             if parse[2]:
                 self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
             if parse[3]:
@@ -98,6 +104,11 @@ class ControlLayer:
         self.symb = int(re.search(r"(?:NUMBER_SYMBOLS\s+(\d+)\s+)", data[1]).group(1))
         self.txt = int(re.search(r"(?:NUMBER_TEXTS\s+(\d+)\s+)", data[1]).group(1))
         self.contours = int(re.search(r"(?:NUMBER_CONTURS\s+(\d+)\s+)", data[1]).group(1))
+        self.nested = {}
+        nests = [[n[0], re.findall(r"(\S+)", n[1])] for n in
+                 re.findall(r"(?:^CONTUR_NESTED\s+(\S+)(?:\s+(.+)))", data[1], re.MULTILINE)]
+        for nest in nests:
+            self.nested[nest[0]] = nest[1]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -148,7 +159,7 @@ class LevelObj:
         if parse[0]:
             self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
         if parse[1]:
-            self.contourObj = [ContC(contour.groups(), hdr, self.lineObj) for contour in parse[1]]
+            self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, nests="", cdicmap="") for contour in parse[1]]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -165,7 +176,10 @@ class LineC:
         self.ptlist = [LinecPt(p.groups(), hdr) for p in rx_ptlist.finditer(array[5])]
         self.get_point_sequence = [pt.get_XY for pt in self.ptlist]
         self.get_referenced_point_sequence = [pt.get_XYR for pt in self.ptlist]
-
+        if len(self.get_point_sequence) != len(self.get_referenced_point_sequence):
+            print("problem")
+        if self.lid == 19757830:
+            print("test")
     def __getitem__(self, item):
         return getattr(self, item)
 
@@ -187,25 +201,61 @@ class LinecPt:
         return getattr(self, item)
 
 
+def ContourDictBuilder(cons):
+    conD = {}
+    for c in cons:
+        c = c.groups()
+        rx_contid = re.compile(r"(\d+)")
+        conD[c[1]] = list(map(int, rx_contid.findall(c[6])))
+    return conD
+
+
 class ContC:
-    def polygonize(self,linestringarray):
+    def polygonize(self, linestringarray):
         pgon = []
-        for ls in linestringarray:
-            ls_rev = ls[]
-            if len(pgon) == 0:
-                pgon.extend(ls)
-            if len(pgon) > 0:
-                if pgon[-1] == ls[0]:
-                    pgon.extend(ls)
-                if pgon[-1] == ls[-1]:
-                    pgon.extend(ls[::-1])
-                if pgon[0] == ls[0]:
-                    pgon = pgon[::-1]
-                    pgon.extend(ls[0])
-        print("complete")
+        lls = linestringarray.copy()
+        plt.figure()
+        for ls_temp in lls:
+            plt.plot([x[0] for x in ls_temp], [y[1] for y in ls_temp])
+
+        # plt.show()
+        try:
+            while len(lls) > 0:
+                if len(pgon) == 0:
+                    pgon.extend(lls[0])
+                    del lls[0]
+
+                else:
+                    app = 0
+                    for currentLine in lls:
+                        if pgon[-1] == currentLine[0] or pgon[-1] == currentLine[-1] or pgon[0] == currentLine[0] or \
+                                pgon[0] == currentLine[-1]:
+                            if pgon[0] == currentLine[0] or pgon[0] == currentLine[-1]:
+                                pgon = pgon[::-1]  ## reverse pgon
+
+                            lastItemInContour = pgon[-1]
+
+                            if lastItemInContour == currentLine[0]:
+                                del currentLine[0]
+                                pgon.extend(currentLine)  ## append straignt line
+                                del lls[lls.index(currentLine)]
+                                app = 1
+
+                            if lastItemInContour == currentLine[-1]:
+                                del currentLine[-1]
+                                pgon.extend(currentLine[::-1])  ## append reversed line
+                                del lls[lls.index(currentLine)]
+                                app = 1
+                    if app == 0:
+                        print("didnt do shit")
+
+            print("VALID PGON")
+        except Exception as e:
+            print(e)
+            print("INVALID PGON")
         return pgon
 
-    def __init__(self, cArray, hdr, lines):
+    def __init__(self, cArray, hdr, lines, nests, cdicmap):
         self.type = cArray[0]
         self.cid = cArray[1]
         self.posY = float(cArray[2])
@@ -213,15 +263,26 @@ class ContC:
         self.datecreated = cArray[4]
         self.datedestroyed = cArray[5]
         rx_contid = re.compile(r"(\d+)")
-        self.ids = list(map(int, rx_contid.findall(cArray[6])))
+        self.all_ids = list(map(int, rx_contid.findall(cArray[6])))
+        self.pgon_ids = set(self.all_ids)
+        self.holes = []
+        if self.cid in nests:
+            for ncon in nests.get(self.cid):
+                nli = set(cdicmap.get(ncon))
+                self.pgon_ids.difference(nli)
+                self.holes.append(list(nli))
+        self.pgon_ids = list(self.pgon_ids)
+
         ll = [ln.lid for ln in lines]
-        self.linelistbase = [l.get_referenced_point_sequence for l in [lines[ll.index(i)] for i in self.ids]]
-        self.lineslist = self.polygonize([l.get_referenced_point_sequence for l in [lines[ll.index(i)] for i in self.ids]])
-        #self.lineslist2 = [item for sublist in [l.get_referenced_point_sequence for l in [lines[ll.index(i)] for i in self.ids]] for item in sublist]
+        self.lineslist = self.polygonize(
+            [l.get_referenced_point_sequence.copy() for l in [lines[ll.index(i)] for i in self.pgon_ids]])
 
         self.posXR = self.posX + hdr.refX
         self.posYR = self.posY + hdr.refY
+        plt.suptitle(self.cid, fontsize=16)
+        #        plt.text([a for a in self.all_ids])
 
+        plt.show()
     def __getitem__(self, item):
         return getattr(self, item)
 
