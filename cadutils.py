@@ -13,8 +13,7 @@ class ReadCadastralFile:
     def __init__(self, data):
         self.Header = HeaderLayer(data)
         self.ControlLayers = ControlLayers(data)
-        self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[
-            [c.id for c in self.ControlLayers.ControlCheckLayers].index("CADASTER")].nested)
+        self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[[c.id for c in self.ControlLayers.ControlCheckLayers].index("CADASTER")].nested)
         self.Buildings = Buildings(data, self.Header)
         self.Tables = Semantic(data)
 
@@ -58,6 +57,18 @@ class HeaderLayer:
 
 
 class CadasterLayer:
+    def ContourDictBuilder(self,conts):
+        conD = {}
+        for c in conts:
+            c = c.groups()
+            rx_contid = re.compile(r"(\d+)")
+            conD[c[1]] = list(map(int, rx_contid.findall(c[6])))
+        return conD
+    def LineDictBuilder(self,lins):
+        lld = {}
+        for i in range(len(lins)):
+            lld[lins[i].lid] = i
+        return lld
     def __init__(self, data, hdr, nests):
 
         rx_cadLayer = re.compile(r"LAYER CADASTER([\s\S]*?)END_LAYER")
@@ -66,12 +77,13 @@ class CadasterLayer:
             parse = objectSearch(extract.group())
 
             if parse[0]:
-                lineparse = list(parse[0])
-                self.lineObj = [LineC(line.groups(), hdr) for line in lineparse]
+                self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
             if parse[1]:
                 contparse = list(parse[1])
-                CDic = ContourDictBuilder(contparse)
-                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, nests, CDic) for contour in contparse]
+                LDic = self.LineDictBuilder(self.lineObj)
+                CDic = self.ContourDictBuilder(contparse)
+
+                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, LDic, nests, CDic) for contour in contparse]
             if parse[2]:
                 self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
             if parse[3]:
@@ -150,6 +162,11 @@ class Building:
 
 
 class LevelObj:
+    def LineDictBuilder(self,lins):
+        lld = {}
+        for i in range(len(lins)):
+            lld[lins[i].lid] = i
+        return lld
     def __init__(self, data, hdr):
         self.lvl = data[1]
         parse = objectSearch(data[2])
@@ -157,7 +174,8 @@ class LevelObj:
         if parse[0]:
             self.lineObj = [LineC(line.groups(), hdr) for line in parse[0]]
         if parse[1]:
-            self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, nests="", cdicmap="") for contour in parse[1]]
+            LDic = self.LineDictBuilder(self.lineObj)
+            self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, LDic, nests="", cdicmap="") for contour in parse[1]]
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -196,13 +214,7 @@ class LinecPt:
         return getattr(self, item)
 
 
-def ContourDictBuilder(cons):
-    conD = {}
-    for c in cons:
-        c = c.groups()
-        rx_contid = re.compile(r"(\d+)")
-        conD[c[1]] = list(map(int, rx_contid.findall(c[6])))
-    return conD
+
 
 
 class ContC:
@@ -214,29 +226,41 @@ class ContC:
                 if len(pgon) == 0:
                     pgon.extend(lls[0])
                     del lls[0]
+                    print("***START_PGON***")
 
-                else:
-                    app = 0
-                    for currentLine in lls:
-                        if pgon[-1] == currentLine[0] or pgon[-1] == currentLine[-1] or pgon[0] == currentLine[0] or \
-                                pgon[0] == currentLine[-1]:
-                            if pgon[0] == currentLine[0] or pgon[0] == currentLine[-1]:
+                for cl in lls:
+                    if pgon[-1] == cl[0] or pgon[-1] == cl[-1] or pgon[0] == cl[0] or pgon[0] == cl[-1]:
+                        if pgon[-1] == cl[0] and pgon[0] == cl[-1]:
+                            #del cl[0]
+                            pgon.extend(cl)  ## append straignt line
+                            del lls[lls.index(cl)]
+                            print("ESS")
+
+                        if pgon[-1] == cl[-1] and pgon[0] == cl[0]:
+                            #del cl[-1]
+                            pgon.extend(cl[::-1])  ## append rev line
+                            del lls[lls.index(cl)]
+                            print("ESR")
+
+                        else:
+
+                            if pgon[0] == cl[0] or pgon[0] == cl[-1]:
                                 pgon = pgon[::-1]  ## reverse pgon
 
+
                             lastItemInContour = pgon[-1]
+                            if lastItemInContour == cl[0]:
+                                del cl[0]
+                                pgon.extend(cl)  ## append straignt line
+                                del lls[lls.index(cl)]
+                                print("SS")
 
-                            if lastItemInContour == currentLine[0]:
-                                del currentLine[0]
-                                pgon.extend(currentLine)  ## append straignt line
-                                del lls[lls.index(currentLine)]
-                                app = 1
 
-                            if lastItemInContour == currentLine[-1]:
-                                del currentLine[-1]
-                                pgon.extend(currentLine[::-1])  ## append reversed line
-                                del lls[lls.index(currentLine)]
-                                app = 1
-
+                            if lastItemInContour == cl[-1]:
+                                del cl[-1]
+                                pgon.extend(cl[::-1])  ## append reversed line
+                                del lls[lls.index(cl)]
+                                print("SR")
 
 
         except Exception as e:
@@ -244,7 +268,7 @@ class ContC:
             print("INVALID PGON")
         return pgon
 
-    def __init__(self, cArray, hdr, lines, nests, cdicmap):
+    def __init__(self, cArray, hdr, lines, linesdic, nests, cdicmap):
         self.type = cArray[0]
         self.cid = cArray[1]
         self.posY = float(cArray[2])
@@ -253,19 +277,14 @@ class ContC:
         self.datedestroyed = cArray[5]
         rx_contid = re.compile(r"(\d+)")
         self.pgon_ids = list(map(int, rx_contid.findall(cArray[6])))
-        # if self.cid in nests:
-        #    for ncon in nests.get(self.cid):
-        #         nli = set(cdicmap.get(ncon))
-        #        self.holes.append(list(nli))
 
-        ll = [ln.lid for ln in lines]
-        self.pgon_ext = self.polygonize(
-            [l.get_referenced_point_sequence.copy() for l in [lines[ll.index(i)] for i in self.pgon_ids]])
+        self.pgon_ext = self.polygonize([lines[linesdic[i]].get_referenced_point_sequence.copy() for i in self.pgon_ids])
 
         if self.cid in nests:
             self.holes = [cdicmap.get(ncon) for ncon in nests.get(self.cid)]
-            hh = [[lines[ll.index(hls)].get_referenced_point_sequence for hls in h] for h in self.holes]
-            self.pgon_holes = self.polygonize(hh)
+            hh = [[lines[linesdic.get(hls)].get_referenced_point_sequence for hls in h] for h in self.holes]
+
+            self.pgon_holes = [self.polygonize(hhh) for hhh in hh ]
         else:
             self.pgon_holes = []
 

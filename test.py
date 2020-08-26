@@ -2,6 +2,7 @@ import os
 
 import cadutils
 
+#import matplotlib as plt
 
 def tests():
     dir = "./testdata"
