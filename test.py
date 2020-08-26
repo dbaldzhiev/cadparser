@@ -1,8 +1,9 @@
 import os
 
+import matplotlib as plt
+
 import cadutils
 
-#import matplotlib as plt
 
 def tests():
     dir = "./testdata"
@@ -26,3 +27,42 @@ def tests():
         else:
             print(f"{testfiles[i]:<30} COMPLETE FAILURE")
     return CF
+
+
+def pl(data):
+    for con in data.CadasterLayer.contourObj:
+        try:
+            plt.ion()
+            plt.figure()
+            plt.suptitle(con.cid, fontsize=16)
+
+            # print(con.pgon_ext)
+            plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
+
+            if len(con.pgon_holes) > 0:
+                # plt.figure()
+                # plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
+                for hole in con.pgon_holes:
+                    plt.plot([x[0] for x in hole], [y[1] for y in hole])
+            # plt.show()
+
+        except Exception:
+            pass
+
+    try:
+        plt.show()
+    except Exception:
+        pass
+
+
+def plsec(data):
+    con = data.CadasterLayer.contourObj[9]
+    plt.figure()
+    plt.suptitle(con.cid, fontsize=16)
+    plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
+    if len(con.pgon_holes) > 0:
+        plt.figure()
+        plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
+        for hole in con.pgon_holes:
+            plt.plot([x[0] for x in hole], [y[1] for y in hole])
+    plt.show()

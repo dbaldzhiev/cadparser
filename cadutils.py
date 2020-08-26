@@ -2,8 +2,12 @@
 # VERSION 2.00 STANDALONE
 # TESTED ON WINDOWS PYTHON 3.8.2
 
+import copy
 import re
 from os import path
+
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 import mik
 
@@ -13,7 +17,8 @@ class ReadCadastralFile:
     def __init__(self, data):
         self.Header = HeaderLayer(data)
         self.ControlLayers = ControlLayers(data)
-        self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[[c.id for c in self.ControlLayers.ControlCheckLayers].index("CADASTER")].nested)
+        self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[
+            [c.id for c in self.ControlLayers.ControlCheckLayers].index("CADASTER")].nested)
         self.Buildings = Buildings(data, self.Header)
         self.Tables = Semantic(data)
 
@@ -83,7 +88,8 @@ class CadasterLayer:
                 LDic = self.LineDictBuilder(self.lineObj)
                 CDic = self.ContourDictBuilder(contparse)
 
-                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, LDic, nests, CDic) for contour in contparse]
+                self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, LDic, nests, CDic) for contour in
+                                   tqdm(contparse)]
             if parse[2]:
                 self.gepointObj = [GeoPointC(geopt.groups(), hdr) for geopt in parse[2]]
             if parse[3]:
@@ -214,58 +220,99 @@ class LinecPt:
         return getattr(self, item)
 
 
-
-
-
 class ContC:
-    def polygonize(self, linestringarray):
+
+    def polygonize(self, linestringarray, deep=True):
+        badcontour = False
         pgon = []
-        lls = linestringarray.copy()
+        pgon_alg = []
+
+        if deep:
+            lls = copy.deepcopy(linestringarray)
+        else:
+            lls = linestringarray
         try:
             while len(lls) > 0:
                 if len(pgon) == 0:
                     pgon.extend(lls[0])
                     del lls[0]
-                    print("***START_PGON***")
+                    pgon_alg.append("IN")
 
                 for cl in lls:
                     if pgon[-1] == cl[0] or pgon[-1] == cl[-1] or pgon[0] == cl[0] or pgon[0] == cl[-1]:
+
+                        if pgon[0] == cl[0] or pgon[0] == cl[-1]:
+                            pgon = pgon[::-1]  ## reverse pgon
+                            pgon_alg.append("REV")
                         if pgon[-1] == cl[0] and pgon[0] == cl[-1]:
-                            #del cl[0]
-                            pgon.extend(cl)  ## append straignt line
+                            del cl[0]
+                            pgon.extend(cl)  ## End Straing
                             del lls[lls.index(cl)]
-                            print("ESS")
+                            pgon_alg.append("ES")
+                            break
 
                         if pgon[-1] == cl[-1] and pgon[0] == cl[0]:
-                            #del cl[-1]
-                            pgon.extend(cl[::-1])  ## append rev line
+                            del cl[-1]
+                            pgon.extend(cl[::-1])  ## End Rev
                             del lls[lls.index(cl)]
-                            print("ESR")
+                            pgon_alg.append("ER")
+                            break
 
                         else:
 
-                            if pgon[0] == cl[0] or pgon[0] == cl[-1]:
-                                pgon = pgon[::-1]  ## reverse pgon
-
-
                             lastItemInContour = pgon[-1]
-                            if lastItemInContour == cl[0]:
+                            if pgon[-1] == cl[0]:
                                 del cl[0]
-                                pgon.extend(cl)  ## append straignt line
+                                pgon.extend(cl)  ## Standard Straight
                                 del lls[lls.index(cl)]
-                                print("SS")
-
+                                pgon_alg.append("SS")
+                                break
 
                             if lastItemInContour == cl[-1]:
                                 del cl[-1]
-                                pgon.extend(cl[::-1])  ## append reversed line
+                                pgon.extend(cl[::-1])  ## Standard Rev
                                 del lls[lls.index(cl)]
-                                print("SR")
+                                pgon_alg.append("SR")
+                                break
+                    else:
 
-
+                        if pgon[0] == pgon[-1]:
+                            chain = self.polygonize(lls, False)
+                            intersection = list(set(pgon).intersection(set(chain)))
+                            if chain[0] == chain[-1]:
+                                if len(intersection) == 1:
+                                    starpoint_pgon_idx = pgon.index(intersection[0])
+                                    starpoint_chain_idx = chain.index(intersection[0])
+                                    chain_pA = chain[:starpoint_chain_idx]
+                                    chain_pB = chain[starpoint_chain_idx:]
+                                    new_chain = chain_pB + chain_pA
+                                    pgon = pgon[:starpoint_pgon_idx + 1] + new_chain[::-1] + pgon[
+                                                                                             1 + starpoint_pgon_idx:]
+                                    break
+                                else:
+                                    print("INVALID PGON too many star points")
+                            else:
+                                badcontour = True
+                                print("STRAY CONTOUR")
         except Exception as e:
             print(e)
-            print("INVALID PGON")
+            print("WHILE HAS FAILED")
+
+        if badcontour and deep:
+            fig, ax = plt.subplots(2)
+            fig.suptitle(self.cid, fontsize=16)
+            for l in linestringarray:
+                # plt.plot([x[0] for x in l], [y[1] for y in l])
+                ax[0].plot([x[0] for x in l], [y[1] for y in l])
+            ax[1].plot([x[0] for x in pgon], [y[1] for y in pgon])
+
+            plt.show()
+
+        if pgon[0] == pgon[-1]:
+            pgon_alg.append("PC")
+        if not pgon[0] == pgon[-1]:
+            print("P NOT C")
+            pgon_alg.append("P NOT C")
         return pgon
 
     def __init__(self, cArray, hdr, lines, linesdic, nests, cdicmap):
@@ -277,7 +324,7 @@ class ContC:
         self.datedestroyed = cArray[5]
         rx_contid = re.compile(r"(\d+)")
         self.pgon_ids = list(map(int, rx_contid.findall(cArray[6])))
-
+        self.tesst = [lines[linesdic[i]].get_referenced_point_sequence.copy() for i in self.pgon_ids]
         self.pgon_ext = self.polygonize([lines[linesdic[i]].get_referenced_point_sequence.copy() for i in self.pgon_ids])
 
         if self.cid in nests:
