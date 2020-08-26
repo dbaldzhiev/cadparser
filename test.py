@@ -37,12 +37,11 @@ def pl(data):
             plt.suptitle(con.cid, fontsize=16)
 
             # print(con.pgon_ext)
-            plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
+            plt.plot([x[0] for x in con.pgon_pt], [y[1] for y in con.pgon_pt])
 
-            if len(con.pgon_holes) > 0:
-                # plt.figure()
-                # plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
-                for hole in con.pgon_holes:
+            if len(con.holes_pt) > 0:
+
+                for hole in con.holes_pt:
                     plt.plot([x[0] for x in hole], [y[1] for y in hole])
             # plt.show()
 
@@ -53,16 +52,3 @@ def pl(data):
         plt.show()
     except Exception:
         pass
-
-
-def plsec(data):
-    con = data.CadasterLayer.contourObj[9]
-    plt.figure()
-    plt.suptitle(con.cid, fontsize=16)
-    plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
-    if len(con.pgon_holes) > 0:
-        plt.figure()
-        plt.plot([x[0] for x in con.pgon_ext], [y[1] for y in con.pgon_ext])
-        for hole in con.pgon_holes:
-            plt.plot([x[0] for x in hole], [y[1] for y in hole])
-    plt.show()

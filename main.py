@@ -1,5 +1,6 @@
 import getopt
 import sys
+from matplotlib import pyplot as plt
 
 import cadutils
 
@@ -23,9 +24,17 @@ except getopt.GetoptError:
 
 if __name__ == '__main__':
     cadFileText = cadutils.opener(filename)
-    cadfileItems = cadutils.ReadCadastralFile(cadFileText)
-    # test.tests()
-    # pl(cadfileItems)
+    cadFileItems = cadutils.ReadCadastralFile(cadFileText)
+    for c in cadFileItems.CadasterLayer.contourObj:
+        if c.pgon_bad_flag:
+            plt.figure()
+            plt.suptitle(c.cid, fontsize=16)
 
+            if c.pgon_pt:
+                plt.plot([x[0] for x in c.pgon_pt], [y[1] for y in c.pgon_pt])
+
+            plt.show()
+    #test.tests()
+    # pl(cadFileItems)
     # a = test.tests()
     print("ab")
