@@ -3,19 +3,26 @@
 # TESTED ON WINDOWS PYTHON 3.8.2
 
 import copy
+import os.path
 import re
 from os import path
-import config
-if config.debug:
-    import matplotlib.pyplot as plt
-    from tqdm import tqdm
 
+import config
+
+if config.debug:
+    try:
+        import matplotlib.pyplot as plt
+        from tqdm import tqdm
+    except:
+        print("Missing debug modules...")
 import mik
 
 
 class ReadCadastralFile:
 
-    def __init__(self, data):
+    def __init__(self, pathtofile):
+        data = opener(pathtofile)
+        self.Filename = os.path.basename(pathtofile)
         self.Header = HeaderLayer(data)
         self.ControlLayers = ControlLayers(data)
         self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[
@@ -317,7 +324,7 @@ class ContC:
         return (pgon, badcontour)
 
     def __init__(self, cArray, hdr, lines, linesdic, nests, cdicmap):
-        self.type = cArray[0]
+        self.type = int(cArray[0])
         self.cid = cArray[1]
         self.posY = float(cArray[2])
         self.posX = float(cArray[3])
@@ -327,8 +334,9 @@ class ContC:
         self.pgon_ids = list(map(int, rx_contid.findall(cArray[6])))
         self.pgon_pt, self.pgon_bad_flag = self.polygonize(
             [lines[linesdic[i]].get_referenced_point_sequence.copy() for i in self.pgon_ids])
-
+        self.holes_exist = False
         if self.cid in nests:
+            self.holes_exist = True
             self.holes_id = [cdicmap.get(ncon) for ncon in nests.get(self.cid)]
             hole_generator = [[lines[linesdic.get(hls)].get_referenced_point_sequence for hls in h] for h in self.holes_id]
             self.holes_pt = []
@@ -364,7 +372,6 @@ class TextC:
         self.objtype = str(array[11])
         self.graphicid = str(array[12])
         self.grapicparam = str(array[13])
-
         self.suffixtext = str(array[14])
 
     def __getitem__(self, item):
@@ -540,3 +547,7 @@ def controlCheck(cl, cc, tb):
     else:
         chk_tb = "N/A"
     return chk_cad, chk_tb
+
+
+def ParseFile(filename):
+    return ReadCadastralFile(filename)
