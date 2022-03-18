@@ -1,11 +1,8 @@
-# -*- coding: utf-8 -*-
-# VERSION 2.00 STANDALONE
-# TESTED ON WINDOWS PYTHON 3.8.2
+# VERSION 3.00
 
 import copy
-import os.path
+import os
 import re
-from os import path
 
 import config
 
@@ -13,7 +10,8 @@ if config.debug:
     try:
         import matplotlib.pyplot as plt
         from tqdm import tqdm
-    except:
+    except Exception as e:
+        print(e)
         print("Missing debug modules...")
 import mik
 
@@ -22,7 +20,7 @@ class ReadCadastralFile:
 
     def __init__(self, pathtofile):
         data = opener(pathtofile)
-        self.Filename = os.path.basename(pathtofile)
+        self.Filename = os.path.basename(pathtofile).replace(".cad", "")
         self.Header = HeaderLayer(data)
         self.ControlLayers = ControlLayers(data)
         self.CadasterLayer = CadasterLayer(data, self.Header, self.ControlLayers.ControlCheckLayers[
@@ -511,7 +509,7 @@ def objectSearch(data):
 
 
 def opener(filename):
-    if path.exists(filename[:-4] + "_cached.tcad"):
+    if os.path.exists(filename[:-4] + "_cached.tcad"):
         filename = filename[:-4] + "_cached.tcad"
     f = open(filename, "rb")
     filetext = f.read()
@@ -547,7 +545,3 @@ def controlCheck(cl, cc, tb):
     else:
         chk_tb = "N/A"
     return chk_cad, chk_tb
-
-
-def ParseFile(filename):
-    return ReadCadastralFile(filename)

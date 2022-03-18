@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-### VERSION 2.00 STANDALONE
+# VERSION 3.00
 
 # Continuous: Solid line
 # CENTER: Center ____ _ ____ _ ____ _ ____ _ ____ _ ____

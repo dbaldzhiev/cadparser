@@ -1,8 +1,8 @@
+# VERSION 3.00
 import copy
 
 import ezdxf
 from ezdxf import zoom
-from ezdxf.tools.standards import linetypes  # some predefined linetypes
 
 import config
 import layerstemplate
@@ -73,15 +73,13 @@ def drawContours(contourObj, doc, ms, layerAlreadyCreated=None):
 
 class geopt_block:
     def __init__(self, dwg):
-        # Create a block with the name 'FLAG'
         geopt = dwg.blocks.new(name='geopt')
-        # geopt.add_polyline2d([(0, 0), (0, 5), (4, 3), (0, 3)])
         geopt.add_circle((0, 0), .15, dxfattribs={'color': 2})
         geopt.add_lwpolyline([(-.3, 0), (.3, 0)], dxfattribs={'color': 2})
         geopt.add_lwpolyline([(0, -.3), (0, .3)], dxfattribs={'color': 2})
         geopt.add_circle((0, 0), .2, dxfattribs={'color': 3})
 
-    def insert(self, modelspace, l, point, xscale, yscale, rot):
+    def insert(self, modelspace, point, xscale, yscale, rot):
         modelspace.add_blockref("geopt", point, dxfattribs={'xscale': xscale, 'yscale': yscale, 'rotation': rot})
 
 
@@ -92,7 +90,7 @@ def geoptdraw(object, doc, ms):
     blk = geopt_block(doc)
     for geopoint in geoptObj:
         try:
-            blk.insert(ms, layer, (geopoint.posXR, geopoint.posYR), 1.0, 1.0, 0.0)
+            blk.insert(ms, (geopoint.posXR, geopoint.posYR), 1.0, 1.0, 0.0)
             ms.add_text(str(geopoint.id),
                         dxfattribs={"layer": layer, 'style': 'custom', 'height': 0.2, 'rotation': 0.0}).set_pos(
                 (geopoint.posXR, geopoint.posYR), align='LEFT')
@@ -128,11 +126,9 @@ def schemadraw(buildings, doc, ms):
 
 
 def makedxf(object):
-    outputPathDXF = "{path}{fname}.dxf".format(path=config.PATHS_CONFIG['dirOutput'], fname=object.Filename)
-
     doc = ezdxf.new(dxfversion='AC1015')
     doc.styles.new('custom', dxfattribs={'font': 'arial.ttf', 'width': 1})
-    for name, desc, pattern in linetypes():
+    for name, desc, pattern in ezdxf.tools.standards.linetypes():
         if name not in doc.linetypes:
             doc.linetypes.new(name=name, dxfattribs={'description': desc, 'pattern': pattern})
     modelspace = doc.modelspace()
@@ -146,4 +142,5 @@ def makedxf(object):
     if len(object.Buildings.list) > 0:
         schemadraw(object.Buildings.list, doc, modelspace)
     zoom.extents(modelspace)
-    doc.saveas("test.dxf")
+    # ezdxf.zoom()
+    doc.saveas("{path}{fname}.dxf".format(path=config.PATHS_CONFIG['dirOutputDXF'], fname=object.Filename))
