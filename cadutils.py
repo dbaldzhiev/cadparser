@@ -1,20 +1,19 @@
 # VERSION 3.00
-
+debug = False
 import copy
 import os
 import re
 
-import config
 
-if config.debug:
+if debug:
     try:
         import matplotlib.pyplot as plt
         from tqdm import tqdm
     except Exception as e:
         print(e)
         print("Missing debug modules...")
-import mik
-
+from mik import *
+from tableTrans import *
 
 class ReadCadastralFile:
 
@@ -54,9 +53,7 @@ class HeaderLayer:
         self.swv = extract[4].replace("\r", "")
         self.date = extract[5].replace("\r", "")
         self.firm = extract[6].replace("\r", "")
-
-        self.refX = float(extract[8].replace("\r", ""))
-        self.refY = float(extract[7].replace("\r", ""))
+        self.refX, self.refY = float(extract[8].replace("\r", "")), float(extract[7].replace("\r", ""))
         self.window = extract[9].replace("\r", "")
         self.coordid = extract[10].replace("\r", "")
         self.coordidh = extract[11].replace("\r", "")
@@ -65,7 +62,6 @@ class HeaderLayer:
 
     def __getitem__(self, item):
         return getattr(self, item)
-
 
 class CadasterLayer:
     def ContourDictBuilder(self,conts):
@@ -93,7 +89,7 @@ class CadasterLayer:
                 contparse = list(parse[1])
                 LDic = self.LineDictBuilder(self.lineObj)
                 CDic = self.ContourDictBuilder(contparse)
-                if config.debug:
+                if debug:
                     contparse = tqdm(contparse)
                 self.contourObj = [ContC(contour.groups(), hdr, self.lineObj, LDic, nests, CDic) for contour in contparse]
             if parse[2]:
@@ -307,7 +303,7 @@ class ContC:
                 whilesstopper += 1
                 badcontour = True
 
-        if badcontour and deep and config.debug:
+        if badcontour and deep and debug:
             fig, ax = plt.subplots(2)
             fig.suptitle(self.cid, fontsize=16)
             for l in data:
@@ -330,8 +326,8 @@ class ContC:
         self.datedestroyed = cArray[5]
         rx_contid = re.compile(r"(\d+)")
         self.pgon_ids = list(map(int, rx_contid.findall(cArray[6])))
-        self.pgon_pt, self.pgon_bad_flag = self.polygonize(
-            [lines[linesdic[i]].get_referenced_point_sequence.copy() for i in self.pgon_ids])
+
+        self.pgon_pt, self.pgon_bad_flag = self.polygonize([lines[linesdic[i]].get_referenced_point_sequence.copy() for i in self.pgon_ids])
         self.holes_exist = False
         if self.cid in nests:
             self.holes_exist = True
@@ -430,8 +426,12 @@ class Semantic:
     def __getitem__(self, item):
         return getattr(self, item)
 
-
+def closest_strings(dictionary, value):
+    closest_codes = sorted(dictionary.keys(), key=lambda x: abs(x - value))[:2]
+    closest_strings = [dictionary[code] for code in closest_codes]
+    return closest_strings
 class Table:
+
     def __init__(self, match):
         self.name = match[0]
         tableBody = match[1]
@@ -457,7 +457,86 @@ class Table:
                 regex_entrys = regex_entrys + ent
 
             rx_entrys = re.compile(regex_entrys, re.MULTILINE)
-            self.entrys = [en.groups() for en in rx_entrys.finditer(match[1])]
+            self.entrys = [list(en.groups()) for en in rx_entrys.finditer(match[1])]
+
+            if self.name == "POZEMLIMOTI":
+                for f in self.fields:
+                    if fields_pozemlimoti.get(f.name) is not None:
+                        f.name = fields_pozemlimoti.get(f.name)
+            if self.name == "PRAVA":
+                for f in self.fields:
+                    if fields_prava.get(f.name) is not None:
+                        f.name = fields_prava.get(f.name)
+            if self.name == "PERSONS":
+                for f in self.fields:
+                    if fields_persons.get(f.name) is not None:
+                        f.name = fields_persons.get(f.name)
+
+            if self.name == "SGRADI":
+                for f in self.fields:
+                    if fields_sgradi.get(f.name) is not None:
+                        f.name = fields_sgradi.get(f.name)
+
+                for value in self.entrys:
+                    if vid_sobstvenost.get(int(value[1])) is not None:
+                        value[1] = vid_sobstvenost.get(int(value[1]))
+                    else:
+                        CS = closest_strings(vid_sobstvenost, int(value[1]))
+                        value[1] = "{0} / {1}".format(CS[0],CS[1])
+
+                    if sg_pred.get(int(value[3])) is not None:
+                        value[3] = sg_pred.get(int(value[3]))
+                    else:
+                        CS = closest_strings(sg_pred, int(value[3]))
+                        value[3] = "{0} / {1}".format(CS[0],CS[1])
+
+            if self.name == "APARTS":
+                for f in self.fields:
+                    if fields_aparts.get(f.name) is not None:
+                        f.name = fields_aparts.get(f.name)
+            if self.name == "ULICI":
+                for f in self.fields:
+                    if fields_ulici.get(f.name) is not None:
+                        f.name = fields_ulici.get(f.name)
+            if self.name == "ADDRESS":
+                for f in self.fields:
+                    if fields_address.get(f.name) is not None:
+                        f.name = fields_address.get(f.name)
+            if self.name == "MESTNOSTI":
+                for f in self.fields:
+                    if fields_mestnosti.get(f.name) is not None:
+                        f.name = fields_mestnosti.get(f.name)
+            if self.name == "ZAPOVEDI":
+                for f in self.fields:
+                    if fields_zapovedi.get(f.name) is not None:
+                        f.name = fields_zapovedi.get(f.name)
+            if self.name == "IZDATELI":
+                for f in self.fields:
+                    if fields_izdateli.get(f.name) is not None:
+                        f.name = fields_izdateli.get(f.name)
+            if self.name == "HISTORY":
+                for f in self.fields:
+                    if fields_history.get(f.name) is not None:
+                        f.name = fields_history.get(f.name)
+            if self.name == "SERVITUTI":
+                for f in self.fields:
+                    if fields_servituti.get(f.name) is not None:
+                        f.name = fields_servituti.get(f.name)
+            if self.name == "OGRPIMO":
+                for f in self.fields:
+                    if fields_address.get(f.name) is not None:
+                        f.name = fields_address.get(f.name)
+            if self.name == "DOCS":
+                for f in self.fields:
+                    if fields_docs.get(f.name) is not None:
+                        f.name = fields_docs.get(f.name)
+            if self.name == "GORIMOTI":
+                for f in self.fields:
+                    if fields_gorimoti.get(f.name) is not None:
+                        f.name = fields_gorimoti.get(f.name)
+
+
+
 
             checker = [chk.groups() for chk in rx_check.finditer(match[1])]
             if len(self.entrys) == len(checker):
@@ -469,7 +548,6 @@ class Table:
 
     def __getitem__(self, item):
         return getattr(self, item)
-
 
 class Field:
     def __init__(self, data):
@@ -513,6 +591,7 @@ def opener(filename):
         filename = filename[:-4] + "_cached.tcad"
     f = open(filename, "rb")
     filetext = f.read()
+    f.close()
     try:
         cadText = filetext.decode("utf-8")
     except Exception:
@@ -525,7 +604,7 @@ def opener(filename):
 
 def translate(input):
     newChars = map(
-        lambda x: bytes([x]) if (x < 128) else bytes(mik.mikdict.get(x), "utf-8") if (x <= 191) and (x >= 128) else b"",
+        lambda x: bytes([x]) if (x < 128) else bytes(mikdict.get(x), "utf-8") if (x <= 191) and (x >= 128) else b"",
         input)
     res = b''.join(newChars).decode("utf-8")
     return res

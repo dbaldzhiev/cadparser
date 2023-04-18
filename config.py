@@ -7,11 +7,10 @@
 debug = True
 
 PATHS_CONFIG = {
-    "dirSource": "C:/Users/User/PycharmProjects/cadparser/testdata/input/",
-    "dirOutputDXF": "C:/Users/User/PycharmProjects/cadparser/testdata/output/",
-    "dirOutputKML": "C:/Users/User/PycharmProjects/cadparser/testdata/output/",
-    "dirBase": "C:/Users/User/PycharmProjects/cadparser/",
-    "dirArchive": "C:/Users/User/PycharmProjects/cadparser/testdata/archive/",
+    "dirSource": "C:/Users/Dimitar/Desktop/cadtest/",
+    "dirOutputDXF": "C:/Users/Dimitar/Desktop/cadtest/output/",
+    "dirOutputKML": "C:/Users/Dimitar/Desktop/cadtest/output",
+    "dirArchive": "C:/Users/Dimitar/Desktop/cadtest/archive",
     "errorpage": "https://cadtodxf.com/error"
 }
 
