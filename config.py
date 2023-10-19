@@ -7,10 +7,8 @@
 debug = True
 
 PATHS_CONFIG = {
-    "dirSource": "C:/Users/Dimitar/Desktop/cadtest/",
-    "dirOutputDXF": "C:/Users/Dimitar/Desktop/cadtest/output/",
-    "dirOutputKML": "C:/Users/Dimitar/Desktop/cadtest/output",
-    "dirArchive": "C:/Users/Dimitar/Desktop/cadtest/archive",
+    "dirOutputDXF": "testdata/output/",
+    "dirOutputKML": "testdata/output/",
     "errorpage": "https://cadtodxf.com/error"
 }
 
