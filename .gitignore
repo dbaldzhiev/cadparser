@@ -1,2 +1,4 @@
-/testdata/
-/venv/
+testdata/
+.venv
+__pycache__
+.vscode
