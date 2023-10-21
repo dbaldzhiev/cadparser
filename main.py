@@ -1,7 +1,7 @@
-# VERSION 3.00
+# VERSION 3.01
 import sys
 
-import cadutils
+import utils
 import config
 import dxfmaker
 import kmlmaker
@@ -9,7 +9,7 @@ import kmlmaker
 if __name__ == '__main__':
     filename = sys.argv[1]
 
-    cadobject = cadutils.ReadCadastralFile(filename)
+    cadobject = utils.ReadCadastralFile(filename)
     dxfmaker.makedxf(cadobject)
     kmlmaker.makekml(cadobject)
 
