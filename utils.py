@@ -439,20 +439,20 @@ class Table:
                                re.MULTILINE)
         self.fields = [Field(found_field.groups()) for found_field in rx_fields.finditer(tableBody)]
         field_types = {
-            "C": "\s*\\\"(.*?)\\\"\s*",
+            "C": "\\s*\\\"(.*?)\\\"\\s*",
             "S": "(.*?)",
             "N": "(.*?)",
             "L": "(.*?)",
             "B": "([TF]?)",
-            "D": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
-            "T": "(\d{1,2}\.\d{1,2}\.\d{2,4})?",
+            "D": "(\\d{1,2}\\.\\d{1,2}\\.\\d{2,4})?",
+            "T": "(\\d{1,2}\\.\\d{1,2}\\.\\d{2,4})?",
         }
         if self.fields:
-            regex_entrys = "^D\s*"
+            regex_entrys = "^D\\s*"
             rx_check = re.compile(regex_entrys + field_types.__getitem__(self.fields[0].type), re.MULTILINE)
             for f in self.fields:
                 ent = field_types.__getitem__(f.type)
-                if regex_entrys != "^D\s*":
+                if regex_entrys != "^D\\s*":
                     ent = "," + ent
                 regex_entrys = regex_entrys + ent
 
