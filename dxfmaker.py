@@ -48,7 +48,7 @@ def drawText(object, doc, ms):
                                             suffix=current.suffixtext.replace("None", ""))
             cleantxt = txt.replace("\\", "").replace("\n", "").replace("\r", "").replace("\"", "")
             ms.add_text(cleantxt, dxfattribs={"layer": layer, 'style': 'custom', 'height': 1.0,
-                                              'rotation': current.rotdeg}).set_pos((current.posXR, current.posYR),
+                                              'rotation': current.rotdeg}).set_placement((current.posXR, current.posYR),
                                                                                    align='LEFT')
         except Exception as e:
             print(e)
@@ -64,7 +64,7 @@ def drawContours(contourObj, doc, ms, layerAlreadyCreated=None):
     for i in range(len(contourObj)):
         try:
             current = contourObj[i]
-            ms.add_text(current.cid, dxfattribs={"layer": layer, 'style': 'custom', 'height': 1.0}).set_pos(
+            ms.add_text(current.cid, dxfattribs={"layer": layer, 'style': 'custom', 'height': 1.0}).set_placement(
                 (current.posXR, current.posYR), align='LEFT')
         except Exception as e:
             print(e)
@@ -92,7 +92,7 @@ def geoptdraw(object, doc, ms):
         try:
             blk.insert(ms, (geopoint.posXR, geopoint.posYR), 1.0, 1.0, 0.0)
             ms.add_text(str(geopoint.id),
-                        dxfattribs={"layer": layer, 'style': 'custom', 'height': 0.2, 'rotation': 0.0}).set_pos(
+                        dxfattribs={"layer": layer, 'style': 'custom', 'height': 0.2, 'rotation': 0.0}).set_placement(
                 (geopoint.posXR, geopoint.posYR), align='LEFT')
         except Exception as e:
             print(e)
