@@ -1,4 +1,5 @@
 testdata/
 .venv
+.conda
 __pycache__
 .vscode
